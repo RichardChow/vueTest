@@ -11,36 +11,36 @@ Vue.use(VueRouter)
 
 const routes = [
   {
-    path: '/',
-    name: 'Login',
-    component: Login
+    path: "/",
+    name: "Login",
+    component: Login,
   },
   {
-    path: '/dashboard',
-    name: 'Dashboard',
-    component: Dashboard
+    path: "/dashboard",
+    name: "Dashboard",
+    component: Dashboard,
   },
   {
-    path: '/version-upgrade',
-    name: 'VersionUpgrade',
-    component: VersionUpgrade
+    path: "/version-upgrade",
+    name: "VersionUpgrade",
+    component: VersionUpgrade,
   },
   {
-    path: '/element-query',
-    name: 'ElementQuery',
-    component: ElementQuery
+    path: "/element-query",
+    name: "ElementQuery",
+    component: ElementQuery,
   },
   {
-    path: '/test-report',
-    name: 'TestReport',
-    component: TestReport
+    path: "/test-report",
+    name: "TestReport",
+    component: TestReport,
   },
   {
-    path: '/version-update-config',
-    name: 'VersionUpdateConfigPage',
-    component: UpdateVersionConfigPage
-  }
-]
+    path: "/version-update-config",
+    name: "VersionUpdateConfigPage",
+    component: UpdateVersionConfigPage,
+  },
+];
 
 const router = new VueRouter({
   mode: 'history',

@@ -185,7 +185,7 @@ export default {
     },
     async loadConfig() {
       try {
-        const response = await axios.get('/api/config');
+        const response = await axios.get('/api/config/');
         this.config = response.data;
         
         // 处理多行输入
