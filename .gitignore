@@ -1,0 +1,4 @@
+# 忽略 node_modules 缓存文件
+node_modules/.cache/
+node_modules/.cache/babel-loader/
+node_modules/.cache/eslint/
