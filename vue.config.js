@@ -2,11 +2,11 @@ module.exports = {
   devServer: {
     proxy: {
       '/api': {
-        target: 'http://172.18.100.176:8083',
+        target: 'http://192.168.0.110:8083',
         changeOrigin: true
       },
       '/ws/upgrade': {
-        target: 'ws://172.18.100.176:8083',
+        target: 'ws://192.168.0.110:8083',
         ws: true,
         changeOrigin: true
       }
@@ -14,5 +14,12 @@ module.exports = {
     host: '0.0.0.0',
     port: 8082,
     https: false
+  },
+  configureWebpack: {
+    resolve: {
+      alias: {
+        '@': require('path').join(__dirname, 'src')
+      }
+    }
   }
 }

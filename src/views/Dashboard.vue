@@ -1,151 +1,142 @@
 <template>
   <div class="dashboard">
-    <div class="sidebar">
-      <h2>Dashboard</h2>
-      <nav>
-        <router-link to="/dashboard" exact>
-          <i class="fas fa-home"></i> 首页
-        </router-link>
-        <router-link to="/version-upgrade">
-          <i class="fas fa-upload"></i> 更新版本
-        </router-link>
-        <router-link to="/element-query">
-          <i class="fas fa-search"></i> 设备查询
-        </router-link>
-        <router-link to="/test-report">
-          <i class="fas fa-chart-bar"></i> 报告统计
-        </router-link>
-      </nav>
-    </div>
-    <div class="main-content">
-      <div class="image-slider">
-        <!-- 这里可以添加图片滚动组件 -->
-        <div class="placeholder">图片滚动区域</div>
-      </div>
-      <h2>欢迎来到仪表板</h2>
-      <!-- 这里可以添加仪表板的主要内容 -->
-    </div>
-    <div class="toolbar">
-      <button @click="logout">
-        <i class="fas fa-sign-out-alt"></i> Log out
-      </button>
-      <button @click="toggleLanguage">
-        <i class="fas fa-language"></i> {{ currentLanguage }}
-      </button>
-    </div>
+    <el-container>
+      <el-aside width="200px">
+        <el-menu
+          :default-active="$route.path"
+          router
+          class="el-menu-vertical"
+        >
+          <el-menu-item index="/version-upgrade">
+            <i class="el-icon-upload"></i>
+            <span>版本升级</span>
+          </el-menu-item>
+          <el-menu-item index="/device-query">
+            <i class="el-icon-search"></i>
+            <span>设备查询</span>
+          </el-menu-item>
+          <el-menu-item index="/test-report">
+            <i class="el-icon-s-data"></i>
+            <span>测试报告</span>
+          </el-menu-item>
+        </el-menu>
+        
+        <!-- 底部按钮区域 -->
+        <div class="bottom-buttons">
+          <el-button 
+            type="text" 
+            class="logout-btn"
+            @click="handleLogout"
+          >
+            Log out
+          </el-button>
+          <el-button 
+            type="text" 
+            class="lang-btn"
+            @click="toggleLanguage"
+          >
+            {{ currentLanguage }}
+          </el-button>
+        </div>
+      </el-aside>
+      <el-main>
+        <router-view></router-view>
+      </el-main>
+    </el-container>
   </div>
 </template>
 
 <script>
-const CHINESE = '中文';
-const ENGLISH = 'English';
-
 export default {
   name: 'Dashboard',
   data() {
     return {
-      currentLanguage: CHINESE,
+      currentLanguage: '中文'
     }
   },
   methods: {
-    logout() {
-      console.log('开始登出操作');
-      this.$router.push('/');
-      console.log('用户已成功登出，已跳转到首页');
+    handleLogout() {
+      this.$store.dispatch('logout')
+      this.$router.push('/login')
+      this.$message({
+        message: '已成功登出',
+        type: 'success'
+      })
     },
     toggleLanguage() {
-      this.currentLanguage = this.currentLanguage === CHINESE ? ENGLISH : CHINESE;
-      console.log('语言切换完成');
+      this.currentLanguage = this.currentLanguage === '中文' ? 'English' : '中文'
+      // 这里可以添加实际的语言切换逻辑
+      this.$message({
+        message: `语言已切换为${this.currentLanguage}`,
+        type: 'success'
+      })
     }
-  },
-  mounted() {
-    console.log('Dashboard 组件已加载');
-    console.log('当前语言：', this.currentLanguage);
-    console.log('应用正在运行于：', window.location.href);
-  },
-  created() {
-    console.log('Dashboard 组件已创建');
-    console.log('Vue 版本：', this.$vue.version);
   }
 }
 </script>
 
 <style scoped>
 .dashboard {
-  display: flex;
   height: 100vh;
 }
 
-.sidebar {
-  width: 200px;
-  background-color: #f0f0f0;
-  padding: 20px;
+.el-container {
+  height: 100%;
 }
 
-.sidebar h2 {
-  margin-bottom: 20px;
-}
-
-.sidebar nav {
+.el-aside {
+  background-color: #304156;
+  color: #fff;
+  position: relative;
   display: flex;
   flex-direction: column;
 }
 
-.sidebar nav a {
-  margin-bottom: 10px;
-  text-decoration: none;
-  color: #333;
-  padding: 10px;
-  border-radius: 5px;
-  transition: background-color 0.3s;
-}
-
-.sidebar nav a:hover,
-.sidebar nav a.router-link-active {
-  background-color: #e0e0e0;
-}
-
-.sidebar nav a i {
-  margin-right: 10px;
-}
-
-.main-content {
+.el-menu {
+  border-right: none;
+  background-color: #304156;
   flex-grow: 1;
+}
+
+.el-menu-item {
+  color: #fff;
+}
+
+.el-menu-item:hover {
+  background-color: #263445;
+}
+
+.el-menu-item.is-active {
+  background-color: #1890ff;
+}
+
+/* 底部按钮样式 */
+.bottom-buttons {
   padding: 20px;
-  overflow-y: auto;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.image-slider {
-  height: 200px;
-  background-color: #e0e0e0;
-  margin-bottom: 20px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.placeholder {
-  color: #666;
-}
-
-.toolbar {
-  width: 100px;
-  background-color: #f0f0f0;
-  padding: 20px;
+  border-top: 1px solid #1f2d3d;
   display: flex;
   flex-direction: column;
+  gap: 10px;
 }
 
-.toolbar button {
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.logout-btn,
+.lang-btn {
+  color: #fff;
+  width: 100%;
+  text-align: left;
+  padding: 10px;
+  transition: all 0.3s;
 }
 
-.toolbar button i {
+.logout-btn:hover,
+.lang-btn:hover {
+  background-color: #263445;
+  color: #fff;
+}
+
+/* 按钮图标样式 */
+.logout-btn i,
+.lang-btn i {
   margin-right: 5px;
 }
 </style>

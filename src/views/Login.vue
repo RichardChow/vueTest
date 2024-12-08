@@ -1,22 +1,46 @@
 <template>
   <div class="login-container">
     <div class="login-box">
-      <img src="@/assets/BombBang-logo.png" alt="BombBang Logo" class="logo">
+      <div class="logo">
+        <img src="@/assets/BombBang-logo.png" alt="BombBang Logo">
+      </div>
       <h2>Welcome to BombBang!</h2>
-      <p>Please sign in below or <a href="#">create an account</a>.</p>
-      <form @submit.prevent="login">
-        <div class="input-group">
-          <input type="text" id="username" v-model="username" placeholder="Username" required>
+      <p class="subtitle">Please sign in below or <a href="#" class="create-account">create an account</a></p>
+      
+      <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form">
+        <el-form-item prop="username">
+          <el-input
+            v-model="loginForm.username"
+            placeholder="Username"
+            class="custom-input"
+          />
+        </el-form-item>
+        
+        <el-form-item prop="password">
+          <el-input
+            v-model="loginForm.password"
+            type="password"
+            placeholder="Password"
+            class="custom-input"
+            @keyup.enter.native="handleLogin"
+          />
+        </el-form-item>
+
+        <div class="remember-me">
+          <el-checkbox v-model="loginForm.remember">Keep me signed in</el-checkbox>
         </div>
-        <div class="input-group">
-          <input type="password" id="password" v-model="password" placeholder="Password" required>
-        </div>
-        <div class="checkbox-group">
-          <input type="checkbox" id="keep-signed-in" v-model="keepSignedIn">
-          <label for="keep-signed-in">Keep me signed in</label>
-        </div>
-        <button type="submit" class="sign-in-button">Sign in</button>
-      </form>
+
+        <el-form-item>
+          <el-button
+            type="primary"
+            :loading="loading"
+            class="login-button"
+            @click.native.prevent="handleLogin"
+          >
+            Sign in
+          </el-button>
+        </el-form-item>
+      </el-form>
     </div>
   </div>
 </template>
@@ -26,104 +50,153 @@ export default {
   name: 'Login',
   data() {
     return {
-      username: '',
-      password: '',
-      keepSignedIn: false
+      loginForm: {
+        username: '',
+        password: '',
+        remember: false
+      },
+      loginRules: {
+        username: [{ required: true, message: 'Please input username', trigger: 'blur' }],
+        password: [{ required: true, message: 'Please input password', trigger: 'blur' }]
+      },
+      loading: false
     }
   },
   methods: {
-    login() {
-      console.log('尝试登录', this.username);
-      // 这里添加登录逻辑
-      // 假设登录成功，跳转到仪表板
-      this.$router.push('/dashboard');
+    handleLogin() {
+      this.$refs.loginForm.validate(valid => {
+        if (valid) {
+          this.loading = true
+          this.$store.dispatch('login', this.loginForm)
+            .then(() => {
+              this.loading = false
+              this.$router.push('/dashboard')
+              this.$message({
+                message: 'Welcome back!',
+                type: 'success'
+              })
+            })
+            .catch(error => {
+              this.loading = false
+              this.$message.error(error.message || 'Login failed')
+            })
+        }
+      })
     }
-  },
-  mounted() {
-    console.log('Login 组件已加载');
   }
 }
 </script>
 
 <style scoped>
 .login-container {
+  min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
-  background-color: #f0f0f0;
+  background-color: #ffffff;
 }
 
 .login-box {
-  background-color: white;
-  padding: 30px;
-  border-radius: 5px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  width: 400px;
+  padding: 40px;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
   text-align: center;
-  max-width: 300px;
-  width: 100%;
 }
 
 .logo {
-  width: 100px;
   margin-bottom: 20px;
+}
+
+.logo img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
 }
 
 h2 {
-  margin-bottom: 10px;
   color: #333;
+  font-size: 24px;
+  margin-bottom: 10px;
+  font-weight: 500;
 }
 
-p {
-  margin-bottom: 20px;
+.subtitle {
   color: #666;
+  margin-bottom: 30px;
 }
 
-.input-group {
-  margin-bottom: 15px;
-}
-
-input[type="text"],
-input[type="password"] {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 3px;
-}
-
-.checkbox-group {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 15px;
-}
-
-.checkbox-group label {
-  margin-left: 5px;
-  color: #666;
-}
-
-.sign-in-button {
-  width: 100%;
-  padding: 10px;
-  background-color: #0077e6;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.sign-in-button:hover {
-  background-color: #005bb8;
-}
-
-a {
-  color: #0077e6;
+.create-account {
+  color: #007bff;
   text-decoration: none;
 }
 
-a:hover {
+.create-account:hover {
   text-decoration: underline;
+}
+
+.login-form {
+  text-align: left;
+}
+
+.custom-input {
+  height: 40px;
+}
+
+.custom-input /deep/ input {
+  height: 40px;
+  background-color: #f8f9fa;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+}
+
+.remember-me {
+  margin: 10px 0 20px;
+  color: #666;
+}
+
+.login-button {
+  width: 100%;
+  height: 40px;
+  background-color: #007bff;
+  border-color: #007bff;
+  font-size: 16px;
+}
+
+.login-button:hover {
+  background-color: #0056b3;
+  border-color: #0056b3;
+}
+
+/* Element UI 样式覆盖 */
+:deep(.el-form-item) {
+  margin-bottom: 20px;
+}
+
+:deep(.el-checkbox__label) {
+  color: #666;
+}
+
+/* 添加一些额外的样式优化 */
+:deep(.el-input__inner) {
+  background-color: #f8f9fa;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  height: 40px;
+}
+
+:deep(.el-input__inner:focus) {
+  border-color: #007bff;
+}
+
+:deep(.el-button--primary) {
+  background-color: #007bff;
+  border-color: #007bff;
+}
+
+:deep(.el-button--primary:hover) {
+  background-color: #0056b3;
+  border-color: #0056b3;
 }
 </style>
