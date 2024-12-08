@@ -182,7 +182,7 @@ export default {
       // 创建初始模型
       this.updatePreview()
 
-      // 动画循��
+      // 动画循环
       this.animate()
     },
 
@@ -195,8 +195,79 @@ export default {
 
     // 处理图片上传
     async handleImageUpload(options) {
-      const file = options.file
-      this.imageUrl = URL.createObjectURL(file)
+      try {
+        const file = options.file;
+        this.deviceImage = file;  // 保存文件对象
+        this.imageUrl = URL.createObjectURL(file);
+
+        // 自动开始生成3D预览
+        await this.generate3DPreview();
+      } catch (error) {
+        Message.error('图片上传失败：' + error.message);
+      }
+    },
+
+    // 生成3D预览
+    async generate3DPreview() {
+      try {
+        if (!this.deviceImage) {
+          Message.error('请先上传设备图片');
+          return;
+        }
+
+        console.log('开始生成3D预览');
+        const formData = new FormData();
+        formData.append('image', this.deviceImage);
+        
+        // 显示加载提示
+        const loading = this.$loading({
+          lock: true,
+          text: '正在生成3D预览...',
+          spinner: 'el-icon-loading',
+          background: 'rgba(0, 0, 0, 0.7)'
+        });
+        
+        try {
+          console.log('发送请求到后端');
+          const response = await request.post('/api/build/', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            },
+            timeout: 30000  // 增加超时时间到30秒
+          });
+          
+          console.log('收到后端响应:', response.data);
+          
+          if (response.data.success) {
+            // 更新3D模型数据
+            const modelData = response.data.model;
+            console.log('模型数据:', modelData);
+            
+            // 更新表单数据
+            this.deviceForm.width = modelData.dimensions.width / 100;  // 转换为合适的单位
+            this.deviceForm.height = modelData.dimensions.height / 100;
+            this.deviceForm.depth = modelData.dimensions.depth / 100;
+            
+            // 创建详细的3D模型
+            this.imageAnalysisResult = {
+              features: modelData.features
+            };
+            
+            // 创建3D模型
+            await this.$nextTick();
+            this.createDetailed3DModel();
+            
+            Message.success('3D预览生成成功');
+          } else {
+            throw new Error(response.data.error || '生成失败');
+          }
+        } finally {
+          loading.close();
+        }
+      } catch (error) {
+        console.error('生成3D预览失败:', error);
+        Message.error('生成3D预览失败：' + (error.response?.data?.error || error.message));
+      }
     },
 
     // 更新3D预览
@@ -265,42 +336,61 @@ export default {
 
     // 创建详细的3D模型
     createDetailed3DModel() {
+      console.log('开始创建详细3D模型');
       if (this.deviceMesh) {
+        console.log('移除现有模型');
         this.scene.remove(this.deviceMesh);
       }
 
-      // 创建设备主体
-      const geometry = new THREE.BoxGeometry(
-        this.deviceForm.width,
-        this.deviceForm.height,
-        this.deviceForm.depth
-      );
+      try {
+        // 创建设备主体
+        const geometry = new THREE.BoxGeometry(
+          this.deviceForm.width,
+          this.deviceForm.height,
+          this.deviceForm.depth
+        );
 
-      // 创建材质
-      const material = new THREE.MeshPhongMaterial({
-        color: 0x2c3e50,
-        transparent: true,
-        opacity: 0.9,
-        metalness: 0.5,
-        roughness: 0.5
-      });
+        // 创建材质
+        const material = new THREE.MeshPhongMaterial({
+          color: 0x2c3e50,
+          transparent: true,
+          opacity: 0.9,
+          metalness: 0.5,
+          roughness: 0.5
+        });
 
-      this.deviceMesh = new THREE.Mesh(geometry, material);
+        this.deviceMesh = new THREE.Mesh(geometry, material);
 
-      // 添加细节特征（如果图像分析检测到）
-      if (this.imageAnalysisResult.features) {
-        this.addDeviceFeatures(this.imageAnalysisResult.features);
+        // 添加细节特征
+        if (this.imageAnalysisResult?.features) {
+          console.log('添加设备特征:', this.imageAnalysisResult.features);
+          this.addDeviceFeatures(this.imageAnalysisResult.features);
+        }
+
+        this.scene.add(this.deviceMesh);
+        
+        // 调整相机位置
+        const maxDimension = Math.max(
+          this.deviceForm.width,
+          this.deviceForm.height,
+          this.deviceForm.depth
+        );
+        
+        this.camera.position.set(
+          maxDimension * 2,
+          maxDimension * 1.5,
+          maxDimension * 2
+        );
+        this.camera.lookAt(0, 0, 0);
+        
+        // 强制渲染更新
+        this.renderer.render(this.scene, this.camera);
+        
+        console.log('3D模型创建完成');
+      } catch (error) {
+        console.error('创建3D模型失败:', error);
+        Message.error('创建3D模型失败：' + error.message);
       }
-
-      this.scene.add(this.deviceMesh);
-      
-      // 调整相机位置以更好地展示模型
-      this.camera.position.set(
-        this.deviceForm.width * 2,
-        this.deviceForm.height * 1.5,
-        this.deviceForm.depth * 2
-      );
-      this.camera.lookAt(0, 0, 0);
     },
 
     // 添加设备特征（端口、指示灯等）
@@ -505,7 +595,7 @@ export default {
   justify-content: center;
 }
 
-/* 输入框样式优化 */
+/* 输��框样式优化 */
 .el-input-number {
   width: 100%;
 }
