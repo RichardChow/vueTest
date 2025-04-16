@@ -19,6 +19,10 @@
             <i class="el-icon-s-data"></i>
             <span>测试报告</span>
           </el-menu-item>
+          <el-menu-item index="/smart-server-room">
+            <i class="el-icon-monitor"></i>
+            <span>智慧机房</span>
+          </el-menu-item>
         </el-menu>
         
         <!-- 底部按钮区域 -->
@@ -40,15 +44,23 @@
         </div>
       </el-aside>
       <el-main>
-        <router-view></router-view>
+        <!-- 如果当前是首页路径，显示3D机房 -->
+        <ServerRoom v-if="$route.path === '/dashboard'" />
+        <!-- 其他路由内容 -->
+        <router-view v-else></router-view>
       </el-main>
     </el-container>
   </div>
 </template>
 
 <script>
+import ServerRoom from '@/components/ServerRoom.vue'
+
 export default {
-  name: 'Dashboard',
+  name: 'AppDashboard',
+  components: {
+    ServerRoom
+  },
   data() {
     return {
       currentLanguage: '中文'
@@ -56,7 +68,7 @@ export default {
   },
   methods: {
     handleLogout() {
-      this.$store.dispatch('logout')
+      localStorage.removeItem('isAuthenticated')
       this.$router.push('/login')
       this.$message({
         message: '已成功登出',
@@ -65,7 +77,6 @@ export default {
     },
     toggleLanguage() {
       this.currentLanguage = this.currentLanguage === '中文' ? 'English' : '中文'
-      // 这里可以添加实际的语言切换逻辑
       this.$message({
         message: `语言已切换为${this.currentLanguage}`,
         type: 'success'
@@ -85,7 +96,7 @@ export default {
 }
 
 .el-aside {
-  background-color: #304156;
+  background-color: #4f6073;
   color: #fff;
   position: relative;
   display: flex;
@@ -94,7 +105,7 @@ export default {
 
 .el-menu {
   border-right: none;
-  background-color: #304156;
+  background-color: #4f6073;
   flex-grow: 1;
 }
 
@@ -103,17 +114,23 @@ export default {
 }
 
 .el-menu-item:hover {
-  background-color: #263445;
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .el-menu-item.is-active {
   background-color: #1890ff;
 }
 
+.el-main {
+  padding: 0;
+  background-color: #f5f5f5;
+  overflow: hidden;
+}
+
 /* 底部按钮样式 */
 .bottom-buttons {
   padding: 20px;
-  border-top: 1px solid #1f2d3d;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -130,7 +147,7 @@ export default {
 
 .logout-btn:hover,
 .lang-btn:hover {
-  background-color: #263445;
+  background-color: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
 

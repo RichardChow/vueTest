@@ -7,7 +7,7 @@
       <h2>Welcome to BombBang!</h2>
       <p class="subtitle">Please sign in below or <a href="#" class="create-account">create an account</a></p>
       
-      <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form">
+      <el-form ref="loginFormRef" :model="loginForm" :rules="loginRules" class="login-form">
         <el-form-item prop="username">
           <el-input
             v-model="loginForm.username"
@@ -22,7 +22,7 @@
             type="password"
             placeholder="Password"
             class="custom-input"
-            @keyup.enter.native="handleLogin"
+            @keyup.enter="handleLogin"
           />
         </el-form-item>
 
@@ -35,7 +35,7 @@
             type="primary"
             :loading="loading"
             class="login-button"
-            @click.native.prevent="handleLogin"
+            @click="handleLogin"
           >
             Sign in
           </el-button>
@@ -47,43 +47,53 @@
 
 <script>
 export default {
-  name: 'Login',
-  data() {
-    return {
-      loginForm: {
-        username: '',
-        password: '',
-        remember: false
-      },
-      loginRules: {
-        username: [{ required: true, message: 'Please input username', trigger: 'blur' }],
-        password: [{ required: true, message: 'Please input password', trigger: 'blur' }]
-      },
-      loading: false
+  name: 'UserLogin'
+}
+</script>
+
+<script setup>
+import { ref, reactive } from 'vue'
+import { useRouter } from 'vue-router'
+import { useStore } from 'vuex'
+import { ElMessage } from 'element-plus'
+
+const router = useRouter()
+const store = useStore()
+const loginFormRef = ref(null)
+const loading = ref(false)
+
+const loginForm = reactive({
+  username: '',
+  password: '',
+  remember: false
+})
+
+const loginRules = {
+  username: [{ required: true, message: 'Please input username', trigger: 'blur' }],
+  password: [{ required: true, message: 'Please input password', trigger: 'blur' }]
+}
+
+const handleLogin = () => {
+  if (!loginFormRef.value) return
+  
+  loginFormRef.value.validate((valid) => {
+    if (valid) {
+      loading.value = true
+      store.dispatch('login', loginForm)
+        .then(() => {
+          loading.value = false
+          router.push('/dashboard')
+          ElMessage({
+            message: 'Welcome back!',
+            type: 'success'
+          })
+        })
+        .catch(error => {
+          loading.value = false
+          ElMessage.error(error.message || 'Login failed')
+        })
     }
-  },
-  methods: {
-    handleLogin() {
-      this.$refs.loginForm.validate(valid => {
-        if (valid) {
-          this.loading = true
-          this.$store.dispatch('login', this.loginForm)
-            .then(() => {
-              this.loading = false
-              this.$router.push('/dashboard')
-              this.$message({
-                message: 'Welcome back!',
-                type: 'success'
-              })
-            })
-            .catch(error => {
-              this.loading = false
-              this.$message.error(error.message || 'Login failed')
-            })
-        }
-      })
-    }
-  }
+  })
 }
 </script>
 
@@ -144,13 +154,6 @@ h2 {
   height: 40px;
 }
 
-.custom-input /deep/ input {
-  height: 40px;
-  background-color: #f8f9fa;
-  border: 1px solid #e4e7ed;
-  border-radius: 4px;
-}
-
 .remember-me {
   margin: 10px 0 20px;
   color: #666;
@@ -169,7 +172,7 @@ h2 {
   border-color: #0056b3;
 }
 
-/* Element UI 样式覆盖 */
+/* Element Plus 样式覆盖 */
 :deep(.el-form-item) {
   margin-bottom: 20px;
 }
@@ -178,7 +181,6 @@ h2 {
   color: #666;
 }
 
-/* 添加一些额外的样式优化 */
 :deep(.el-input__inner) {
   background-color: #f8f9fa;
   border: 1px solid #e4e7ed;

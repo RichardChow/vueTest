@@ -1,12 +1,11 @@
-import Vue from 'vue'
-import Vuex from 'vuex'
+import { createStore } from 'vuex'
 
-Vue.use(Vuex)
-
-export default new Vuex.Store({
-  state: {
-    isAuthenticated: false,
-    user: null
+export default createStore({
+  state() {
+    return {
+      isAuthenticated: false,
+      user: null
+    }
   },
   mutations: {
     SET_AUTH(state, auth) {

@@ -1,22 +1,28 @@
-import Vue from 'vue'
+import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import store from './store'
-import ElementUI from 'element-ui'
-import 'element-ui/lib/theme-chalk/index.css'
+import ElementPlus from 'element-plus'
+import 'element-plus/dist/index.css'
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import axios from 'axios'
-
-Vue.use(ElementUI)
-Vue.config.productionTip = false
-
-// 配置axios
-Vue.prototype.$axios = axios
 
 // 添加全局样式
 import './styles/global.css'
 
-new Vue({
-  router,
-  store,
-  render: h => h(App)
-}).$mount('#app')
+const app = createApp(App)
+
+// 挂载 axios
+app.config.globalProperties.$axios = axios
+
+// 使用插件
+app.use(router)
+app.use(store)
+app.use(ElementPlus)
+
+// 注册所有图标
+for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+  app.component(key, component)
+}
+
+app.mount('#app')

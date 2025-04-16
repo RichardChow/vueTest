@@ -1,5 +1,4 @@
-import Vue from 'vue'
-import VueRouter from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import Login from '@/views/Login.vue'
 import Dashboard from '@/views/Dashboard.vue'
 import VersionUpgrade from '@/views/VersionUpgrade.vue'
@@ -8,8 +7,8 @@ import TestReport from '@/views/TestReport.vue'
 import UpdateVersionConfigPage from '../views/VersionUpdateConfigPage.vue'
 import DeviceQuery from '../views/DeviceQuery.vue'
 import CreateDevice from '../views/CreateDevice.vue'
-
-Vue.use(VueRouter)
+import SmartServerRoom from '../views/SmartServerRoom.vue'
+import SmartServerRoomNew from '../views/SmartServerRoomNew.vue'
 
 const routes = [
   {
@@ -55,12 +54,21 @@ const routes = [
     path: '/create-device',
     name: 'CreateDevice',
     component: CreateDevice
+  },
+  {
+    path: '/smart-server-room',
+    name: 'SmartServerRoom',
+    component: SmartServerRoom
+  },
+  {
+    path: '/smart-server-room-new',
+    name: 'SmartServerRoomNew',
+    component: SmartServerRoomNew
   }
 ];
 
-const router = new VueRouter({
-  mode: 'history',
-  base: process.env.BASE_URL,
+const router = createRouter({
+  history: createWebHistory(process.env.BASE_URL),
   routes
 })
 

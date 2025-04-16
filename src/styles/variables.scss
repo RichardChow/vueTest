@@ -1,0 +1,53 @@
+// 颜色变量
+$bg-color: var(--bg-color, #0a1222);
+$text-color: var(--text-color, #ffffff);
+$primary-color: var(--primary-color, #66ccff);
+$primary-color-dark: var(--primary-color-dark, #0099cc);
+$secondary-color: var(--secondary-color, #0066cc);
+$accent-color: var(--accent-color, #00ff66);
+$warning-color: var(--warning-color, #ffaa00);
+$error-color: var(--error-color, #ff3366);
+$success-color: var(--success-color, #00cc66);
+
+// 面板相关
+$panel-bg: var(--panel-bg, rgba(15, 25, 40, 0.8));
+$panel-border: var(--panel-border, rgba(102, 204, 255, 0.3));
+$section-border: var(--section-border, rgba(102, 204, 255, 0.3));
+
+// 字体
+$font-family-base: 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+$font-family-code: 'Courier New', monospace;
+
+// 字体大小
+$font-size-small: 12px;
+$font-size-base: 14px;
+$font-size-medium: 16px;
+$font-size-large: 20px;
+
+// 间距
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-md: 16px;
+$spacing-lg: 24px;
+$spacing-xl: 32px;
+
+// 圆角
+$border-radius-sm: 3px;
+$border-radius-md: 5px;
+$border-radius-lg: 8px;
+
+// 阴影
+$shadow-light: 0 0 5px rgba(0, 0, 0, 0.1);
+$shadow-medium: 0 0 10px rgba(0, 0, 0, 0.2);
+$shadow-heavy: 0 0 15px rgba(0, 0, 0, 0.3);
+
+// 动画时间
+$transition-fast: 0.15s;
+$transition-normal: 0.3s;
+$transition-slow: 0.5s;
+
+// 媒体查询断点
+$breakpoint-sm: 576px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 992px;
+$breakpoint-xl: 1200px;

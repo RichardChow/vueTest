@@ -628,7 +628,7 @@ export default {
       }
     });
   },
-  beforeDestroy() {
+  beforeUnmount() {
     // 移除事件监听器
     window.removeEventListener('upgradeConfigUpdated', this.loadConfig);
 

@@ -1,0 +1,303 @@
+<template>
+  <server-room-scene
+    :model-path="modelPath"
+    @object-clicked="onObjectClicked"
+    @object-hover="onObjectHover"
+    @scene-ready="onSceneReady"
+    ref="serverRoomScene"
+    :background-color="backgroundColor"
+    :enable-transparent-background="enableTransparentBackground"
+    :current-view="currentView"
+  />
+</template>
+
+<script>
+import { ref, onMounted, onBeforeUnmount } from 'vue';
+import ServerRoomScene from '@/components/three/ServerRoomScene.vue';
+
+export default {
+  name: 'ServerRoom',
+  components: {
+    ServerRoomScene
+  },
+  props: {
+    modelPath: {
+      type: String,
+      default: '/models/animated/server_room_animated.gltf'
+    },
+    backgroundColor: {
+      type: String,
+      default: '#020a1a' // 默认深蓝色背景，与科幻风格匹配
+    },
+    enableTransparentBackground: {
+      type: Boolean,
+      default: false
+    },
+    currentView: {
+      type: String,
+      default: 'main'
+    }
+  },
+  emits: ['object-clicked', 'scene-ready', 'object-hover', 'view-changed'],
+  setup(props, { emit }) {
+    // 创建对场景组件的引用
+    const serverRoomScene = ref(null);
+    
+    // 转发事件到父组件
+    const onObjectClicked = (data) => {
+      emit('object-clicked', data);
+    };
+    
+    const onObjectHover = (data) => {
+      emit('object-hover', data);
+    };
+    
+    const onSceneReady = (data) => {
+      emit('scene-ready', data);
+    };
+    
+    // 公共方法，代理到 ServerRoomScene
+    const getObjectByName = (name) => {
+      return serverRoomScene.value?.getObjectByName(name) || null;
+    };
+    
+    const resetCamera = () => {
+      if (serverRoomScene.value) {
+        if (typeof serverRoomScene.value.resetCamera === 'function') {
+          serverRoomScene.value.resetCamera();
+        } else if (typeof serverRoomScene.value.resetToMainScene === 'function') {
+          serverRoomScene.value.resetToMainScene();
+        }
+      }
+    };
+    
+    // 场景切换相关方法
+    const createSingleRackScene = (rackData) => {
+      console.log('ServerRoom组件: 调用createSingleRackScene，参数:', rackData);
+      
+      if (!serverRoomScene.value) {
+        console.error('ServerRoom组件: serverRoomScene引用为空，无法切换场景');
+        return false;
+      }
+      
+      // 检查组件是否有这个方法
+      if (typeof serverRoomScene.value.createSingleRackScene !== 'function') {
+        console.error('ServerRoom组件: serverRoomScene组件没有createSingleRackScene方法');
+        console.log('可用方法:', Object.keys(serverRoomScene.value));
+        return false;
+      }
+      
+      try {
+        console.log('ServerRoom组件: 调用ServerRoomScene组件的createSingleRackScene方法');
+        const result = serverRoomScene.value.createSingleRackScene(rackData);
+        console.log('ServerRoom组件: 场景切换结果:', result);
+        return result;
+      } catch (error) {
+        console.error('ServerRoom组件: 调用createSingleRackScene时发生错误:', error);
+        return false;
+      }
+    };
+    
+    const createSingleDeviceScene = (deviceData) => {
+      if (serverRoomScene.value) {
+        return serverRoomScene.value.createSingleDeviceScene(deviceData);
+      }
+      return false;
+    };
+    
+    const resetToMainScene = () => {
+      if (serverRoomScene.value) {
+        return serverRoomScene.value.resetToMainScene();
+      }
+      return false;
+    };
+    
+    const animateDevice = (deviceName) => {
+      if (serverRoomScene.value) {
+        return serverRoomScene.value.animateDevice(deviceName);
+      }
+      return false;
+    };
+    
+    // 添加机架旋转方法
+    const animateRackRotation = (targetRotation) => {
+      if (serverRoomScene.value && typeof serverRoomScene.value.animateRackRotation === 'function') {
+        console.log('ServerRoom组件: 调用animateRackRotation，目标角度:', targetRotation);
+        return serverRoomScene.value.animateRackRotation(targetRotation);
+      }
+      return false;
+    };
+
+    // 切换到机架正面视图
+    const switchToFrontView = () => {
+      if (serverRoomScene.value && typeof serverRoomScene.value.switchToFrontView === 'function') {
+        console.log('ServerRoom组件: 调用switchToFrontView');
+        return serverRoomScene.value.switchToFrontView();
+      }
+      return false;
+    };
+    
+    // 添加新的公共方法
+    const focusOnDevice = (deviceName) => {
+      if (serverRoomScene.value) {
+        return serverRoomScene.value.focusOnDevice(deviceName);
+      }
+      return false;
+    };
+    
+    // 获取当前悬停的对象信息
+    const getHoveredObject = () => {
+      if (serverRoomScene.value && serverRoomScene.value.$refs.baseScene) {
+        const result = serverRoomScene.value.$refs.baseScene.getHoveredObject();
+        return result;
+      }
+      return null;
+    };
+    
+    // Three.js相关资源初始化和清理
+    const init = () => {
+      // 初始化逻辑在ServerRoomScene组件中已实现
+      console.log('ServerRoom组件初始化');
+    };
+    
+    const onWindowResize = () => {
+      // 窗口大小调整处理
+      console.log('窗口大小改变');
+    };
+    
+    // 定义disposeScene函数在使用前
+    const disposeScene = (scene) => {
+      if (!scene) return;
+      
+      console.log('清理场景资源');
+      scene.traverse((object) => {
+        // 清理几何体
+        if (object.geometry) {
+          object.geometry.dispose();
+        }
+        
+        // 清理材质
+        if (object.material) {
+          // 处理材质数组
+          if (Array.isArray(object.material)) {
+            object.material.forEach(material => disposeMaterial(material));
+          } else {
+            // 处理单个材质
+            disposeMaterial(object.material);
+          }
+        }
+        
+        // 清理其他属性
+        if (object.dispose && typeof object.dispose === 'function') {
+          object.dispose();
+        }
+      });
+    };
+    
+    // 辅助函数：清理材质及其贴图资源
+    const disposeMaterial = (material) => {
+      if (!material) return;
+      
+      // 清理材质的所有纹理资源
+      if (material.map) material.map.dispose();
+      if (material.lightMap) material.lightMap.dispose();
+      if (material.bumpMap) material.bumpMap.dispose();
+      if (material.normalMap) material.normalMap.dispose();
+      if (material.displacementMap) material.displacementMap.dispose();
+      if (material.specularMap) material.specularMap.dispose();
+      if (material.envMap) material.envMap.dispose();
+      
+      // 通用遍历所有可能的纹理属性
+      for (const key in material) {
+        const value = material[key];
+        if (value && value.isTexture) {
+          value.dispose();
+        }
+      }
+      
+      // 清理材质本身
+      material.dispose();
+    };
+    
+    // 组件挂载
+    onMounted(() => {
+      init();
+      window.addEventListener('resize', onWindowResize, false);
+    });
+    
+    // 组件销毁前的清理工作
+    onBeforeUnmount(() => {
+      console.log('ServerRoom组件卸载，执行清理...');
+      
+      // 移除事件监听器
+      window.removeEventListener('resize', onWindowResize, false);
+      
+      // 取消任何可能正在进行的动画
+      if (window.animationFrameId) {
+        cancelAnimationFrame(window.animationFrameId);
+        window.animationFrameId = null;
+      }
+      
+      // 释放Three.js资源
+      if (serverRoomScene.value) {
+        // 如果有控制器，先清理控制器
+        if (serverRoomScene.value.controls) {
+          serverRoomScene.value.controls.dispose();
+        }
+        
+        // 清理场景内的所有资源
+        if (serverRoomScene.value.scene) {
+          disposeScene(serverRoomScene.value.scene);
+        }
+        
+        // 清理渲染器
+        if (serverRoomScene.value.renderer) {
+          serverRoomScene.value.renderer.dispose();
+          serverRoomScene.value.renderer.forceContextLoss();
+          serverRoomScene.value.renderer.domElement = null;
+        }
+        
+        // 清理其他THREE.js对象的引用
+        if (serverRoomScene.value.camera) {
+          serverRoomScene.value.camera = null;
+        }
+        
+        if (serverRoomScene.value.raycaster) {
+          serverRoomScene.value.raycaster = null;
+        }
+        
+        // 设置为null释放引用
+        serverRoomScene.value = null;
+      }
+      
+      console.log('ServerRoom组件资源清理完成');
+    });
+    
+    return {
+      serverRoomScene,
+      onObjectClicked,
+      onObjectHover,
+      onSceneReady,
+      getObjectByName,
+      resetCamera,
+      focusOnDevice,
+      getHoveredObject,
+      // 场景切换相关方法
+      createSingleRackScene,
+      createSingleDeviceScene,
+      resetToMainScene,
+      animateDevice,
+      animateRackRotation,
+      switchToFrontView
+      // 不再需要导出disposeScene函数，因为已经在内部定义并使用
+    };
+  }
+};
+</script>
+
+<style lang="scss" scoped>
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 组件本身不需要额外样式，因为基础组件已经处理了必要的样式
+</style> 

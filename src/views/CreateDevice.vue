@@ -137,7 +137,7 @@
         <el-table-column prop="name" label="设备名称"></el-table-column>
         <el-table-column prop="device_type" label="设备类型"></el-table-column>
         <el-table-column label="3D预览" width="150">
-          <template slot-scope="scope">
+          <template #default="scope">
             <el-button 
               size="small" 
               type="primary"
@@ -151,7 +151,7 @@
     <!-- 3D预览对话框 -->
     <el-dialog
       title="3D预览"
-      :visible.sync="previewDialogVisible"
+      v-model="previewDialogVisible"
       width="70%"
       :before-close="handlePreviewClose"
     >
@@ -164,7 +164,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import request from '@/utils/request'
-import { Message } from 'element-ui'
+import { ElMessage as Message } from 'element-plus'
 
 export default {
   name: 'CreateDevice',
@@ -230,7 +230,7 @@ export default {
     async handleImageUpload({ file }) {
       console.log('开始上传图片:', file.name)
       try {
-        // 检查已��传图片数量
+        // 检查已上传图片数量
         if (this.deviceImages.length >= 4) {
           Message.warning('最多上传4张不同角度的图片')
           return
@@ -832,7 +832,7 @@ export default {
     // 添加相关的辅助方法
     addLED(position, color) {
       console.log('添加LED:', { position, color })
-      // 实现LED添��逻辑
+      // 实现LED添加逻辑
       const geometry = new THREE.SphereGeometry(0.01) // 1cm直径的球体
       const material = new THREE.MeshStandardMaterial({
         color: color || 0xff0000,
@@ -901,7 +901,7 @@ export default {
     this.init3DScene()
     this.fetchDeviceList();
   },
-  beforeDestroy() {
+  beforeUnmount() {
     // 清理THREE.js资源
     if (this.renderer) {
       this.renderer.dispose()

@@ -1,0 +1,94 @@
+@use './variables.scss' as vars;
+@use "sass:color";
+
+// 弹性布局
+@mixin flex($direction: row, $justify: flex-start, $align: stretch, $wrap: nowrap) {
+  display: flex;
+  flex-direction: $direction;
+  justify-content: $justify;
+  align-items: $align;
+  flex-wrap: $wrap;
+}
+
+// 绝对定位
+@mixin absolute($top: auto, $right: auto, $bottom: auto, $left: auto) {
+  position: absolute;
+  top: $top;
+  right: $right;
+  bottom: $bottom;
+  left: $left;
+}
+
+// 固定定位
+@mixin fixed($top: auto, $right: auto, $bottom: auto, $left: auto) {
+  position: fixed;
+  top: $top;
+  right: $right;
+  bottom: $bottom;
+  left: $left;
+}
+
+// 文本溢出省略
+@mixin text-ellipsis {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+// 多行文本溢出省略
+@mixin multi-line-ellipsis($lines: 2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: $lines;
+  -webkit-box-orient: vertical;
+}
+
+// 面板样式
+@mixin panel-style {
+  background: vars.$panel-bg;
+  border: 1px solid vars.$panel-border;
+  border-radius: vars.$border-radius-md;
+  box-shadow: vars.$shadow-medium;
+  overflow: hidden;
+}
+
+// 玻璃拟态效果
+@mixin glassmorphism($opacity: 0.8) {
+  background: rgba(15, 25, 40, $opacity);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+// 渐变背景
+@mixin gradient-bg($direction: 90deg, $start-color: vars.$primary-color, $end-color: vars.$secondary-color) {
+  background: linear-gradient($direction, $start-color, $end-color);
+}
+
+// 状态颜色
+@mixin status-color($status) {
+  @if $status == 'normal' {
+    color: vars.$accent-color;
+  } @else if $status == 'warning' {
+    color: vars.$warning-color;
+  } @else if $status == 'error' {
+    color: vars.$error-color;
+  } @else if $status == 'offline' {
+    color: #888888;
+  } @else {
+    color: vars.$text-color;
+  }
+}
+
+// 响应式媒体查询
+@mixin respond-to($breakpoint) {
+  @if $breakpoint == sm {
+    @media (min-width: vars.$breakpoint-sm) { @content; }
+  } @else if $breakpoint == md {
+    @media (min-width: vars.$breakpoint-md) { @content; }
+  } @else if $breakpoint == lg {
+    @media (min-width: vars.$breakpoint-lg) { @content; }
+  } @else if $breakpoint == xl {
+    @media (min-width: vars.$breakpoint-xl) { @content; }
+  }
+}
