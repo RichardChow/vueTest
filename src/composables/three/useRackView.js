@@ -3,318 +3,414 @@ import * as THREE from 'three';
 import { reactive } from 'vue';
 
 export function useRackView() {
-  // 维护机架视图自身的内部状态
+  // 维护机架视图状态
   const rackViewState = reactive({
-    selectedRackData: null,    // 当前显示的机架数据
-    isActive: false,           // 当前视图是否激活
-    rackScene: null,           // 【新增】存储独立的机架场景
-    sceneContainer: null,      // 【可能保留】场景内的容器 Group
-    sceneOrigin: null          // 【可能保留】容器内的原点 Group
+    selectedRack: null,
+    isActive: false,
+    sceneContainer: null,
+    sceneOrigin: null
   });
 
   /**
-   * 创建单机架视图 (重构后)
-   * @param {Object} rackData - 机架数据 (包含 name 等信息)
-   * @param {Object} context - 上下文，包含必要的外部引用和方法
-   * @returns {THREE.Scene | null} 返回新创建的场景对象，或在失败时返回 null
+   * 创建单机架视图
+   * @param {Object} rackData - 机架数据
+   * @param {Object} context - 场景上下文
+   * @returns {Boolean} 是否成功创建
    */
   function createSingleRackScene(rackData, context) {
-    const {
-      // 【注意】不再直接使用或修改 context.scene (主场景)
-      camera,             // 共享的相机
-      renderer,           // 共享的渲染器 (可能需要设置其场景)
-      controls,           // 共享的控制器
-      mainModel,          // 主模型引用 (用于查找和克隆)
-      getObjectByName,    // 查找对象的方法 (在 mainModel 上操作)
-      // setupDeviceInteractivity, // 这个现在应该在克隆对象后在新场景中处理
-      // sceneState,        // 【移除】不再直接操作外部共享状态
-      emitViewChanged     // 用于通知外部状态变更
+    const { 
+      scene, 
+      camera, 
+      renderer, 
+      controls,
+      mainModel,
+      getObjectByName, 
+      setupDeviceInteractivity,
+      sceneState,
+      emitViewChanged
     } = context;
-
-    if (!mainModel) {
-      console.error('[useRackView] 缺少主模型引用 (mainModel)');
-      return null;
+    
+    if (!scene || !mainModel) {
+      console.error('缺少基础场景或模型引用');
+      return false;
     }
-    if (!camera || !controls) {
-        console.error('[useRackView] 缺少相机或控制器引用');
-        return null;
+    
+    console.log('创建单机架视图，参数:', rackData);
+    
+    // 保存选中的机架信息
+    rackViewState.selectedRack = rackData;
+    
+    // 更新组件状态
+    if (sceneState) {
+      sceneState.selectedRack = rackData;
     }
-
-    console.log('[useRackView] 开始创建单机架视图，机架数据:', rackData);
-
-    // --- 1. 创建新的独立场景 ---
-    const newRackScene = new THREE.Scene();
-    // 可以设置背景，或者让渲染器清除背景
-    newRackScene.background = new THREE.Color(0x050810); // 设置一个稍暗的背景
-
-    // --- 2. 添加灯光到新场景 ---
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // 调整光照强度
-    newRackScene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(5, 10, 7.5); // 调整光源位置
-    newRackScene.add(directionalLight);
-    // 可选：添加点光源或其他光源增强效果
-    // const pointLight = new THREE.PointLight(0xffffff, 0.5);
-    // pointLight.position.set(0, 2, 2);
-    // newRackScene.add(pointLight);
-
-    // --- 3. 查找原始机架对象 ---
-    const rackObject = getObjectByName(rackData.name); // 在 mainModel 中查找
+    
+    // 查找选中的机架对象
+    const rackObject = getObjectByName(rackData.name);
     if (!rackObject) {
-      console.error(`[useRackView] 在主模型中找不到机架对象: ${rackData.name}`);
-      // 【注意】这里需要清理已创建的 newRackScene 中的资源吗？暂时不，因为还没添加复杂对象
-      return null;
+      console.error('找不到机架对象:', rackData.name);
+      return false;
     }
-    console.log('[useRackView] 找到原始机架对象:', rackObject.name);
-    const rackOriginalPosition = rackObject.position.clone(); // 保存原始位置用于计算相对位置
-
-    // --- 4. 创建场景容器和原点 (在新场景中) ---
-    const sceneContainer = new THREE.Group();
-    sceneContainer.name = `RackViewContainer_${rackData.name}`;
-    newRackScene.add(sceneContainer);
-
-    const origin = new THREE.Group();
-    origin.name = `RackOrigin_${rackData.name}`;
-    // origin.position.y = -0.2; // 可以根据需要调整垂直位置
-    sceneContainer.add(origin);
-
-
+    
+    console.log('找到机架对象:', rackObject.name, '位置:', rackObject.position);
+    
     try {
-      // --- 5. 克隆机架并添加到新场景的原点 ---
-      const rackClone = rackObject.clone(true); // 深度克隆
-      rackClone.position.set(0, 0, 0); // 重置在原点内的位置
-      origin.add(rackClone);
-      console.log('[useRackView] 已克隆机架并添加到新场景');
-
-      // --- 6. 处理克隆机架的材质和 userData ---
-      rackClone.traverse((child) => {
-        if (child.isMesh) {
-          child.castShadow = false; // 单视图通常不需要阴影
-          child.receiveShadow = false;
-          if (!child.userData) child.userData = {};
-          child.userData.isInteractive = true; // 标记为可交互
-          child.userData.type = 'rack';
-
-          if (child.material) {
-            // 克隆材质，防止共享材质导致的问题
-            if (Array.isArray(child.material)) {
-              child.material = child.material.map(mat => mat.clone());
-            } else {
-              child.material = child.material.clone();
-            }
-            // 可选：保存原始材质信息，用于高亮等
-            // child.userData.originalMaterial = ...;
-          }
+      // 提取机架名称，用于匹配相关设备
+      let rackBaseName = '';
+      if (rackData.name.includes('Rack-')) {
+        rackBaseName = rackData.name.split('_')[0]; // 获取"Rack-XX"部分
+        console.log('提取的机架基本名称:', rackBaseName);
+      } else {
+        // 如果没有标准命名，使用整个名称
+        rackBaseName = rackData.name;
+      }
+      
+      // 创建新的场景
+      const mainScene = scene;
+      const sceneChildren = [...mainScene.children];
+      sceneChildren.forEach(child => {
+        if (child !== mainModel && !child.isLight) {
+          mainScene.remove(child);
         }
       });
-
-      // --- 7. 查找并克隆相关设备到新场景的原点 ---
+      
+      // 1. 清除原始模型，并创建一个新的场景容器
+      mainScene.remove(mainModel);
+      
+      // 2. 创建新的场景容器
+      const sceneContainer = new THREE.Group();
+      mainScene.add(sceneContainer);
+      
+      // 3. 创建原点，用于放置机架和设备
+      const origin = new THREE.Group();
+      // 将整个机架组向上移动一点，避开底部黑色区域
+      origin.position.y = -0.2; // 向上移动一小段距离
+      sceneContainer.add(origin);
+      
+      // 4. 克隆机架并添加到新场景
+      const rackClone = rackObject.clone(true);
+      rackClone.position.set(0, 0, 0); // 重置位置到原点
+      origin.add(rackClone);
+      
+      // 5. 确保机架材质正确
+      rackClone.traverse((child) => {
+        if (child.isMesh && child.material) {
+          // 处理数组材质
+          if (Array.isArray(child.material)) {
+            child.material = child.material.map(mat => {
+              // 克隆材质确保独立性
+              const newMat = mat.clone();
+              // 确保不是黑色
+              if (newMat.color && newMat.color.r === 0 && newMat.color.g === 0 && newMat.color.b === 0) {
+                newMat.color.setRGB(0.8, 0.8, 0.8);
+              }
+              return newMat;
+            });
+          } 
+          // 处理单个材质
+          else {
+            // 克隆材质确保独立性
+            child.material = child.material.clone();
+            if (child.material.color && 
+                child.material.color.r === 0 && 
+                child.material.color.g === 0 && 
+                child.material.color.b === 0) {
+              child.material.color.setRGB(0.8, 0.8, 0.8);
+            }
+          }
+          
+          // 设置交互标记
+          child.userData.isInteractive = true;
+          child.userData.type = 'rack';
+          child.userData.originalMaterial = {
+            color: child.material.color ? child.material.color.clone() : new THREE.Color(0xcccccc),
+            opacity: child.material.opacity || 1.0,
+            transparent: child.material.transparent || false
+          };
+          
+          // 禁用阴影
+          child.castShadow = false;
+          child.receiveShadow = false;
+        }
+      });
+      
+      // 6. 保存原始机架位置，用于计算设备相对位置
+      const rackOriginalPosition = rackObject.position.clone();
+      
+      // 7. 查找并添加相关设备
       let deviceCount = 0;
-      // 从 rackData 中提取基础名称用于匹配
-      let rackBaseName = rackData.name.includes('Rack-') ? rackData.name.split('_')[0] : rackData.name;
-
-      mainModel.traverse((child) => { // 遍历原始主模型查找设备
+      mainModel.traverse((child) => {
+        // 查找与该机架相关的设备
         if (child.name && child.name.startsWith('NE_') && child.name.includes(rackBaseName)) {
-          const deviceClone = child.clone(true); // 深度克隆设备
-
-          // 计算相对位置
+          console.log("找到设备:", child.name);
+          
+          // 克隆设备
+          const deviceClone = child.clone(true);
+          
+          // 计算设备相对于原始机架的偏移量
           const relativePosition = new THREE.Vector3().subVectors(
-            child.position,
-            rackOriginalPosition // 使用保存的原始机架位置
+            child.position, 
+            rackOriginalPosition
           );
-          deviceClone.position.copy(relativePosition); // 设置相对位置
-
-          // 处理克隆设备的材质和 userData
+          
+          // 设置设备相对于机架的位置
+          deviceClone.position.copy(relativePosition);
+          
+          // 确保设备材质正确
           deviceClone.traverse((subChild) => {
-            if (subChild.isMesh) {
+            if (subChild.isMesh && subChild.material) {
+              // 处理数组材质
+              if (Array.isArray(subChild.material)) {
+                subChild.material = subChild.material.map(mat => {
+                  // 克隆材质确保独立性
+                  const newMat = mat.clone();
+                  // 确保不是黑色
+                  if (newMat.color && newMat.color.r === 0 && newMat.color.g === 0 && newMat.color.b === 0) {
+                    newMat.color.setRGB(0.8, 0.8, 0.8);
+                  }
+                  return newMat;
+                });
+              } 
+              // 处理单个材质
+              else {
+                // 克隆材质确保独立性
+                subChild.material = subChild.material.clone();
+                if (subChild.material.color && 
+                    subChild.material.color.r === 0 && 
+                    subChild.material.color.g === 0 && 
+                    subChild.material.color.b === 0) {
+                  subChild.material.color.setRGB(0.8, 0.8, 0.8);
+                }
+              }
+              
+              // 设置交互标记
+              subChild.userData.isInteractive = true;
+              subChild.userData.type = 'device';
+              subChild.userData.originalDevice = child.name;
+              subChild.userData.originalMaterial = {
+                color: subChild.material.color ? subChild.material.color.clone() : new THREE.Color(0xcccccc),
+                opacity: subChild.material.opacity || 1.0,
+                transparent: subChild.material.transparent || false
+              };
+              
+              // 禁用阴影
               subChild.castShadow = false;
               subChild.receiveShadow = false;
-              if (!subChild.userData) subChild.userData = {};
-              subChild.userData.isInteractive = true; // 标记为可交互
-              subChild.userData.type = 'NE'; // 或更具体的设备类型
-              subChild.userData.originalDeviceName = child.name; // 保存原始名称
-
-              if (subChild.material) {
-                if (Array.isArray(subChild.material)) {
-                  subChild.material = subChild.material.map(mat => mat.clone());
-                } else {
-                  subChild.material = subChild.material.clone();
-                }
-                 // 可选：保存原始材质信息
-                // subChild.userData.originalMaterial = ...;
-              }
-              // 【重要】调用 setupDeviceInteractivity (如果需要在 useRackView 内部处理)
-              // if (setupDeviceInteractivity) {
-              //    setupDeviceInteractivity(subChild); // 但更推荐在交互 Composable 中处理
-              // }
             }
           });
-
-          origin.add(deviceClone); // 添加到新场景的原点
+          
+          // 记录设备原始位置，用于后续动画
+          if (sceneState && sceneState.currentDevicePositions) {
+            sceneState.currentDevicePositions.set(deviceClone.id, deviceClone.position.clone());
+          }
+          
+          // 添加到场景原点
+          origin.add(deviceClone);
           deviceCount++;
-          console.log(`[useRackView] 添加克隆设备: ${child.name} 到新场景`);
+          
+          // 设置设备交互
+          if (setupDeviceInteractivity) {
+            setupDeviceInteractivity(deviceClone);
+          }
+          
+          console.log(`添加设备到单机架视图: ${child.name}`);
         }
       });
-      console.log(`[useRackView] 共添加 ${deviceCount} 个设备到新场景`);
-
-
-      // --- 8. 旋转原点 (可选，用于初始视角) ---
-      origin.rotation.y = Math.PI / 4; // 初始侧面 45 度视角
-
-
-      // --- 9. 调整【共享】相机聚焦到新场景内容 ---
-      // 计算新场景内容的边界框
-      const box = new THREE.Box3().setFromObject(sceneContainer); // 使用容器计算边界
+      
+      console.log(`添加了 ${deviceCount} 个设备到单机架视图`);
+      
+      // 8. 旋转整个原点以获得更好的视角
+      origin.rotation.y = Math.PI / 4; // 改为45度，以获得侧面视图效果
+      if (sceneState) {
+        sceneState.isFrontView = false; // 初始设置为侧面视图
+      }
+      
+      // 10. 调整相机视角
+      // 计算边界框，用于定位相机
+      const box = new THREE.Box3().setFromObject(sceneContainer);
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3());
-
-      // 检查边界框是否有效
-      if (size.length() === 0 || !box.min || !box.max || box.isEmpty()) {
-          console.warn("[useRackView] 计算出的边界框无效，使用默认相机位置。");
-          camera.position.set(0, 1, 3); // 设置一个备用位置
-          controls.target.set(0, 0, 0);
-      } else {
-          const maxDim = Math.max(size.x, size.y, size.z);
-          const fov = camera.fov * (Math.PI / 180);
-          // 调整距离因子，确保机架充满视图，但不过近
-          const distanceFactor = 1.5; // 稍微拉远一点
-          let cameraDistance = Math.abs(maxDim / (2 * Math.tan(fov / 2))) * distanceFactor;
-          cameraDistance = Math.max(cameraDistance, 1.5); // 保证最小距离
-
-          // 设置相机位置（例如，侧前方视角）
-          camera.position.set(
-              center.x + cameraDistance * 0.7, // X 偏移实现侧视
-              center.y + cameraDistance * 0.4, // Y 偏移实现俯视
-              center.z + cameraDistance * 0.7  // Z 距离
-          );
-          // 设置相机目标点为容器中心
-          controls.target.copy(center);
+      
+      // 计算适当的相机距离
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const fov = camera.fov * (Math.PI / 180);
+      const cameraDistance = (maxDim / 2) / Math.tan(fov / 2) * 1.2;
+      
+      // 设置相机位置 - 修改为更平行的视角（减少Y轴高度）
+      camera.position.set(
+        center.x, 
+        center.y + maxDim * 0.3, // 原来是0.7，现在降低为0.3，减少俯视角度
+        center.z + cameraDistance * 1.0 // 原来是0.8，现在增加到1.0，让相机距离更远一些
+      );
+      
+      // 设置相机目标 - 稍微调整目标点，让视线更加水平
+      controls.target.set(
+        center.x,
+        center.y + maxDim * 0.1 - 0.2, // 减去0.2以匹配机架的上移
+        center.z
+      );
+      controls.update();
+      
+      // 强制更新矩阵以确保准确的交互计算
+      sceneContainer.updateWorldMatrix(true, true);
+      
+      // 强制重绘场景
+      if (renderer) {
+        renderer.render(mainScene, camera);
       }
-      controls.update(); // 更新控制器使相机朝向目标
-      console.log('[useRackView] 已调整相机视角');
-
-
-      // --- 10. 更新内部状态 ---
-      rackViewState.selectedRackData = rackData;
+      
+      // 保存状态
       rackViewState.isActive = true;
-      rackViewState.rackScene = newRackScene; // 存储新场景的引用
       rackViewState.sceneContainer = sceneContainer;
       rackViewState.sceneOrigin = origin;
-
-
-      // --- 11. 通知外部视图已切换，并传递新场景 ---
+      
+      // 更新组件状态
+      if (sceneState) {
+        sceneState.currentView = 'single-rack';
+        sceneState.singleRackScene = sceneContainer;
+        sceneState.singleRackContainer = sceneContainer;
+        sceneState.singleRackOrigin = origin;
+      }
+      
+      // 通知父组件视图已变更
       if (emitViewChanged) {
         emitViewChanged({
-            view: 'single-rack',
-            data: rackData,
-            scene: newRackScene // 传递新场景的引用
+          view: 'single-rack',
+          data: rackData
         });
-        console.log('[useRackView] 已发出 view-changed 事件，切换到 single-rack');
       }
-
-      return newRackScene; // 返回新创建的场景
-
+      
+      console.log('单机架视图创建完成');
+      return true;
     } catch (error) {
-      console.error('[useRackView] 创建单机架视图过程中发生错误:', error);
-      // 【需要错误处理】如果克隆或处理中出错，需要清理 newRackScene
-      // disposeSceneResources(newRackScene); // 假设有这个清理函数
-      rackViewState.isActive = false; // 重置状态
-      rackViewState.rackScene = null;
-      // 可能需要通知外部创建失败
-      // if (emitViewChanged) { emitViewChanged({ view: 'main', error: true }); }
-      return null;
+      console.error('创建单机架视图时出错:', error);
+      return false;
     }
   }
 
-  // ... destroySingleRackScene 函数也需要重构 ...
-
-  // 【辅助函数】清理场景资源（示例，需要根据实际情况完善）
-  function disposeSceneResources(sceneObj) {
-      if (!sceneObj) return;
-      sceneObj.traverse((object) => {
-          if (object.geometry) {
-              object.geometry.dispose();
-              // console.log(`Disposed geometry for ${object.name}`);
-          }
-          if (object.material) {
-              if (Array.isArray(object.material)) {
-                  object.material.forEach(material => {
-                      if (material.map) material.map.dispose();
-                      material.dispose();
-                  });
-              } else {
-                  if (object.material.map) object.material.map.dispose();
-                  object.material.dispose();
-              }
-              // console.log(`Disposed material for ${object.name}`);
-          }
+/**
+ * 销毁单机架视图
+ * @param {Object} context - 场景上下文
+ * @returns {Boolean} 是否成功销毁
+ */
+function destroySingleRackScene(context) {
+    const { scene, sceneState, mainModel, emitViewChanged, renderer, camera } = context;
+    
+    if (!rackViewState.isActive) return false;
+    
+    try {
+      console.log('开始清理单机架视图');
+      
+      // 1. 找到并移除所有为单机架视图创建的容器和对象
+      const container = scene.getObjectByName("SingleRackSceneContainer");
+      const origin = scene.getObjectByName("SingleRackOrigin");
+      
+      // 记录要移除的对象列表
+      const objectsToRemove = [];
+      
+      // 查找所有相关对象
+      scene.traverse((object) => {
+        // 检查与单机架视图相关的所有对象
+        if (object.name && (
+            object.name === "SingleRackSceneContainer" || 
+            object.name === "SingleRackOrigin" ||
+            (object.userData && object.userData.singleRackView === true)
+        )) {
+          objectsToRemove.push(object);
+        }
       });
-      // 清空场景
-      while(sceneObj.children.length > 0){
-          sceneObj.remove(sceneObj.children[0]);
+      
+      // 移除找到的所有对象
+      objectsToRemove.forEach(obj => {
+        if (obj.parent) {
+          console.log(`移除对象: ${obj.name}`);
+          obj.parent.remove(obj);
+        }
+      });
+      
+      // 2. 确保直接移除容器和原点(为防止遍历没有捕获到)
+      if (container && container.parent) {
+        console.log('移除单机架容器');
+        container.parent.remove(container);
       }
-      console.log(`[useRackView] Scene resources disposed for scene: ${sceneObj.uuid}`);
-  }
-
-
-  // --- 需要重构 destroySingleRackScene ---
-  /**
-   * 销毁单机架视图 (需要重构)
-   * @param {Object} context - 上下文，包含恢复相机等所需信息
-   * @returns {Boolean}
-   */
-  function destroySingleRackScene(context) {
-      const { camera, controls, emitViewChanged, originalCameraPosition, originalControlsTarget } = context;
-
-      console.log('[useRackView] 开始销毁单机架视图...');
-
-      if (!rackViewState.isActive || !rackViewState.rackScene) {
-          console.warn('[useRackView] 单机架视图未激活或场景不存在，无需销毁。');
-          return false;
+      
+      if (origin && origin.parent) {
+        console.log('移除单机架原点');
+        origin.parent.remove(origin);
       }
-
-      // --- 1. 清理独立的机架场景资源 ---
-      disposeSceneResources(rackViewState.rackScene);
-      console.log('[useRackView] 单机架场景资源已释放');
-
-      // --- 2. 重置内部状态 ---
-      rackViewState.selectedRackData = null;
+      
+      // 3. 强制清理场景中可能残留的任何无父级对象
+      const cleanupScene = (sceneObj) => {
+        // 创建子对象数组的副本，因为在遍历过程中会修改children数组
+        const children = [...sceneObj.children];
+        for (const child of children) {
+          // 检查是否为单机架视图的对象
+          if (child !== mainModel && !child.isLight && 
+              (!child.type || child.type !== 'AmbientLight') && 
+              (!child.type || child.type !== 'DirectionalLight')) {
+            console.log(`清理可能的残留对象: ${child.name || '未命名'}`);
+            sceneObj.remove(child);
+            
+            // 递归清理子对象的资源
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+              if (Array.isArray(child.material)) {
+                child.material.forEach(mat => mat.dispose());
+              } else {
+                child.material.dispose();
+              }
+            }
+          }
+        }
+      };
+      
+      // 4. 恢复主场景模型
+      if (mainModel && !scene.children.includes(mainModel)) {
+        console.log('重新添加主场景模型');
+        scene.add(mainModel);
+      }
+      
+      // 5. 执行全场景清理
+      cleanupScene(scene);
+      
+      // 6. 更新状态
       rackViewState.isActive = false;
-      rackViewState.rackScene = null;
+      rackViewState.selectedRack = null;
       rackViewState.sceneContainer = null;
       rackViewState.sceneOrigin = null;
-      console.log('[useRackView] 内部状态已重置');
-
-      // --- 3. 恢复相机位置和目标 ---
-      // 【重要】原始相机位置应由调用者管理和传入
-      if (originalCameraPosition && originalControlsTarget && camera && controls) {
-          camera.position.copy(originalCameraPosition);
-          controls.target.copy(originalControlsTarget);
-          controls.update();
-          console.log('[useRackView] 相机已恢复到主视图位置');
-      } else {
-          console.warn('[useRackView] 未提供原始相机状态，无法恢复相机');
-          // 可以设置一个默认的主视图相机位置作为备用
-          // camera.position.set(0, 2, 5);
-          // controls.target.set(0, 0, 0);
-          // controls.update();
+      
+      // 7. 更新组件状态
+      if (sceneState) {
+        sceneState.currentView = 'main';
+        sceneState.singleRackScene = null;
+        sceneState.singleRackContainer = null;
+        sceneState.singleRackOrigin = null;
       }
-
-      // --- 4. 通知外部视图已切换回主视图 ---
+      
+      // 8. 强制重绘场景
+      if (renderer && camera) {
+        renderer.render(scene, camera);
+      }
+      
+      // 9. 通知父组件
       if (emitViewChanged) {
-          emitViewChanged({ view: 'main' });
-          console.log('[useRackView] 已发出 view-changed 事件，切换回 main');
+        emitViewChanged({
+          view: 'main',
+          data: null
+        });
       }
-
+      
+      console.log('单机架视图清理完成');
       return true;
+    } catch (error) {
+      console.error('清理单机架视图时出错:', error);
+      return false;
+    }
   }
 
-
-  // 返回状态和方法
   return {
-    rackViewState, // 只读的状态
+    rackViewState,
     createSingleRackScene,
     destroySingleRackScene
-    // 可能还有其他与机架视图相关的方法，如旋转机架等
   };
 }
