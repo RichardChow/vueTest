@@ -8,10 +8,21 @@
     :ambient-light-intensity="ambientLightIntensity"
     :directional-light-intensity="directionalLightIntensity"
     @object-clicked="handleObjectClick"
-    @object-hover="handleObjectHover"
     @scene-ready="handleSceneReady"
     @model-loaded="handleModelLoaded"
     ref="baseScene"
+  />
+
+  <!-- 修改 Tooltip 组件的 props 绑定 -->
+  <Tooltip
+    :visible="tooltip.visible"
+    :title="tooltip.title"
+    :content="tooltip.content"
+    :html-content="tooltip.htmlContent"
+    :x="tooltip.x"
+    :y="tooltip.y"
+    :type="tooltip.type"
+    :style="tooltipStyle"
   />
 </template>
 
@@ -19,12 +30,33 @@
 import BaseThreeScene from '@/components/three/BaseThreeScene.vue';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { markRaw } from 'vue';
-
+import { markRaw, nextTick, ref, reactive, watch, onMounted, getCurrentInstance } from 'vue';
+import { 
+  isDevice, 
+  isNetworkElement, 
+  setupDeviceProperties, 
+  DEVICE_TYPES,
+  formatDeviceName // <--- 新增导入
+} from '@/utils/deviceUtils';
+import { 
+  saveOriginalColor, 
+  restoreOriginalColor, 
+  setHighlightColor, 
+  setDeviceHighlight, 
+  setDeviceOutlineHighlight,
+  createColorMap, 
+  HIGHLIGHT_COLORS 
+} from '@/utils/colorUtils';
+import { useRackView } from '@/composables/three/useRackView';
+import { useDeviceView } from '@/composables/three/useDeviceView';
+import { useSceneInteractions } from '@/composables/three/useSceneInteractions';
+import { useTooltip } from '@/composables/ui/useTooltip';
+import Tooltip from '@/components/ui/Tooltip.vue';
 export default {
   name: 'ServerRoomScene',
   components: {
-    BaseThreeScene
+    BaseThreeScene,
+    Tooltip
   },
   props: {
     modelPath: {
@@ -60,17 +92,20 @@ export default {
       default: 'main' // 'main', 'single-rack', 'single-device'
     }
   },
-  emits: ['object-clicked', 'object-hover', 'scene-ready', 'model-loaded', 'view-changed'],
-  data() {
-    return {
-      deviceInteractionState: {
+  emits: ['object-clicked', 'object-hover', 'scene-ready', 'model-loaded', 'view-changed', 'update:currentView'],
+  setup() {
+    const deviceInteractionState = reactive({
         selectedDevice: null,
         hoveredDevice: null,
-        originalColors: new Map(), // 存储原始颜色
-        originalPositions: new Map() // 存储原始位置
-      },
+      originalColors: new Map(), // 旧的颜色储存方式，保留向后兼容
+      originalPositions: new Map(), // 保存原始位置
+      colorMap: createColorMap(), // 新的颜色管理对象
+      isSceneReady: false,
+      lastHighlightedObject: null
+    });
+    
       // 场景状态
-      sceneState: {
+    const sceneState = reactive({
         currentView: 'main', // 'main', 'single-rack', 'single-device'
         mainScene: null,
         singleRackScene: null,
@@ -85,9 +120,10 @@ export default {
         animatedDeviceParts: [], // 动画中的设备部件
         currentDevicePositions: new Map(), // 当前动画中的设备位置
         showTooltipInSingleRack: false // 在单机架视图中是否显示悬停提示
-      },
+    });
+
       // 动画状态
-      animationState: {
+    const animationState = reactive({
         isAnimating: false,
         startTime: 0,
         duration: 1000,
@@ -95,11 +131,236 @@ export default {
         targetPosition: null,
         startTarget: null,
         targetTarget: null
+    });
+    
+    // 指针悬停处理
+    const pointer = reactive({ x: 0, y: 0 });
+    const width = ref(0);
+    const height = ref(0);
+    
+    // 悬停状态管理
+    const hoverState = reactive({
+      raycaster: null,
+      mouse: new THREE.Vector2(),
+      tooltipInfo: {
+        visible: false,
+        x: 0,
+        y: 0,
+        title: '',
+        status: 'normal',
+        info: ''
       },
-      // 指针悬停处理
-      pointer: { x: 0, y: 0 },
-      width: 0,
-      height: 0
+      lastHoveredObject: null
+    });
+    const sceneContainer = ref(null);
+    
+    // 直接事件处理状态 - 新增
+    const directEventState = reactive({
+      initialized: false,
+      raycaster: null,
+      mouse: null,
+      lastIntersection: null,
+      hoveredObject: null
+    });
+    
+    // 创建对baseScene的引用
+    const baseScene = ref(null);
+    
+    // 使用机架视图composable
+    const { 
+      rackViewState, 
+      createSingleRackScene: _createSingleRackScene, 
+      destroySingleRackScene 
+    } = useRackView();
+
+    // 使用设备视图 composable
+    const {
+      deviceViewState,
+      createSingleDeviceScene: _createSingleDeviceScene,
+      destroySingleDeviceScene,
+      animateDevice: _animateDevice
+    } = useDeviceView();
+
+    const { 
+      state: interactionState,
+      setDependencies,
+      onObjectClick,
+      onObjectHover,
+      getHoveredObject,
+      setPickableObjects
+    } = useSceneInteractions();
+
+    const {
+      tooltipState,
+      tooltip,
+      tooltipStyle,
+      showTooltip,
+      hideTooltip,
+      updatePosition
+    } = useTooltip({
+      offset: { x: 10, y: 10 } 
+    });
+    
+    // 设置设备交互属性的辅助函数
+    const setupDeviceInteractivity = (deviceObject) => {
+      // 设置设备为可交互
+      if (!deviceObject.userData) deviceObject.userData = {};
+      deviceObject.userData.isInteractive = true;
+      
+      // 如果是网元设备，设置相应类型
+      if (deviceObject.name && deviceObject.name.startsWith('NE_')) {
+        deviceObject.userData.type = 'NE';
+      } else {
+        deviceObject.userData.type = 'device';
+      }
+    };
+    
+    // 创建内部处理函数
+    const handleObjectClickSetup = (object, eventData) => {
+      console.log('Object clicked in setup:', object?.name);
+      // 基本处理逻辑，具体实现可以在组件挂载后补充
+      const data = {
+        name: object.name,
+        type: object.userData?.type || 'unknown',
+        position: {
+          x: object.position.x,
+          y: object.position.y,
+          z: object.position.z
+        }
+      };
+    };
+
+    const highlightObjectSetup = (object) => {
+      console.log('Highlight object in setup:', object?.name);
+      // 高亮基本逻辑
+    };
+
+    const resetHighlightSetup = (object) => {
+      console.log('Reset highlight in setup:', object?.name);
+      // 重置高亮基本逻辑
+    };
+
+    // 定义内部引用，用于桥接methods和setup
+    const methodsRef = ref({
+      handleObjectClick: null,
+      highlightObject: null,
+      resetHighlight: null
+    });
+
+    // 在组件挂载后设置引用
+    onMounted(() => {
+      // 确保组件实例可用
+      const instance = getCurrentInstance();
+      if (instance) {
+        methodsRef.value = {
+          handleObjectClick: instance.ctx.handleObjectClick,
+          highlightObject: instance.ctx.highlightObject,
+          resetHighlight: instance.ctx.resetHighlight
+        };
+      }
+      
+      if (baseScene.value) {
+        setDependencies({
+          sceneRef: baseScene.value.scene,
+          cameraRef: baseScene.value.camera,
+          containerReference: baseScene.value.$el
+        });
+        
+        // 如果有模型，设置为可拾取
+        if (baseScene.value.model) {
+          setPickableObjects(baseScene.value.model);
+        }
+      }
+    });
+
+    // 监听模型加载完成，更新可交互对象
+    watch(() => baseScene.value?.model, (newModel) => {
+      if (newModel) {
+        setPickableObjects(newModel);
+      }
+    }, { immediate: true });
+
+    // 注册点击处理函数
+    onObjectClick((object) => {
+      if (object && methodsRef.value.handleObjectClick) {
+        const data = {
+          name: object.name,
+          type: object.userData?.type || 'unknown',
+          position: {
+            x: object.position.x,
+            y: object.position.y,
+            z: object.position.z
+          }
+        };
+        methodsRef.value.handleObjectClick(data);
+      }
+    });
+
+    // 注册悬停处理函数
+    onObjectHover({
+      onEnter: (object, eventData) => {
+        if (object && methodsRef.value.highlightObject) {
+          methodsRef.value.highlightObject(object); 
+        }
+        
+        if (object) {
+          // --- 修改内容生成逻辑 ---
+          const formattedName = formatDeviceName(object.name); // 使用 formatDeviceName
+          const title = formattedName; // 将格式化名称设为标题
+          const content = ''; // 保持内容为空，或根据需要添加其他信息
+          // 例如: const content = `状态: ${object.userData?.status || '未知'}`;
+          
+          const type = object.userData?.status === 'error' ? 'error' : 
+                       object.userData?.status === 'warning' ? 'warning' : 'info';
+          
+          showTooltip({ 
+            title: title, 
+            content: content, 
+            type: type,
+            x: eventData.position.clientX,
+            y: eventData.position.clientY,
+          });
+          // --- 内容修改结束 ---
+        }
+      },
+      onLeave: (object, eventData) => {
+        if (object && methodsRef.value.resetHighlight) {
+          methodsRef.value.resetHighlight(object); 
+        }
+        hideTooltip();
+      },
+      onHover: (object, eventData) => {
+        if (tooltip.visible) {
+          updatePosition(eventData.position.clientX, eventData.position.clientY); 
+        }
+      }
+    });
+
+    
+    return {
+      deviceInteractionState,
+      sceneState,
+      animationState,
+      pointer,
+      width,
+      height,
+      hoverState,
+      sceneContainer,
+      directEventState,
+      baseScene,
+      rackViewState,
+      _createSingleRackScene,
+      destroySingleRackScene,
+      setupDeviceInteractivity,
+      deviceViewState,
+      _createSingleDeviceScene,
+      destroySingleDeviceScene,
+      _animateDevice,
+      interactionState,
+      getHoveredObject,
+      methodsRef,
+      tooltip, // <--- 修改这里
+      tooltipStyle // <--- 新增返回
     };
   },
   computed: {
@@ -167,39 +428,36 @@ export default {
               );
             }
             
-            // 使用优化的判断函数
-            if (this.isDevice(child)) {
-              console.log('标记为网元设备:', child.name);
-              child.userData.isInteractive = true;
-              child.userData.type = 'server'; 
+            // 使用工具函数设置设备属性，更加简洁和统一
+            if (isDevice(child)) {
+              console.log('标记为设备:', child.name);
+              // 设置设备属性
+              setupDeviceProperties(child);
               
-              // 可以进一步从名称中提取设备细节
-              const deviceDetails = this.extractDeviceDetails(child.name);
-              if (deviceDetails) {
-                child.userData.model = deviceDetails.model;
-                child.userData.position = deviceDetails.position;
-                // 其他设备细节...
+              // 兼容旧代码，对NE_开头的设备特殊处理
+              if (isNetworkElement(child.name) && (!child.userData.type || child.userData.type === 'device')) {
+                child.userData.type = DEVICE_TYPES.NE;
               }
             } else if (child.name.toLowerCase().includes('rack')) {
               // 通常机架主体是Group，但以防万一也检查Mesh
               child.userData.isInteractive = true;
-              child.userData.type = 'rack';
+              child.userData.type = DEVICE_TYPES.RACK;
               console.log(`设置交互标记 (Mesh): ${child.name} -> rack`);
             }
           }
           
           // --- 新增：检查 Group 对象 ---
           if (child.isGroup) {
-             if (child.name.startsWith('NE_')) {
+            if (isNetworkElement(child.name)) {
               // 如果设备本身是Group
               child.userData.isInteractive = true;
-              child.userData.type = 'device';
+              child.userData.type = DEVICE_TYPES.NE; // 明确设置为NE
               child.userData.category = this.getDeviceCategory(child.name);
               console.log(`设置交互标记 (Group): ${child.name} -> device`);
             } else if (child.name.toLowerCase().includes('rack')) {
               // 如果机架是Group
               child.userData.isInteractive = true;
-              child.userData.type = 'rack';
+              child.userData.type = DEVICE_TYPES.RACK;
               console.log(`设置交互标记 (Group): ${child.name} -> rack`);
             }
           }
@@ -233,6 +491,27 @@ export default {
       
       // 根据当前视图处理点击事件
       if (this.sceneState.currentView === 'single-rack') {
+        // 检查是否点击了当前已经弹出的设备
+        const isNetworkElement = data.name && data.name.startsWith('NE_');
+        const isClickingSameDevice = this.deviceInteractionState.selectedDevice && 
+                                     this.deviceInteractionState.selectedDevice.name === data.name;
+        
+        if (isClickingSameDevice && this.deviceInteractionState.interactionStage === 1) {
+          console.log('点击已弹出的设备，只执行复位动作，不触发新的点击事件');
+          
+          // 复位动画 - 直接调用，不通过emit向上传递点击事件
+          if (isNetworkElement) {
+            this.animateDevice(data.name);
+          }
+          
+          // 设置选中的设备为null
+          this.deviceInteractionState.selectedDevice = null;
+          
+          // 不触发click事件
+          return;
+        }
+        
+        // 非复位操作的正常点击处理
         this.handleSingleRackViewClick(data);
       } else if (this.sceneState.currentView === 'single-device') {
         this.handleSingleDeviceViewClick(data);
@@ -260,7 +539,7 @@ export default {
         this.createSingleRackScene(data);
       }
       // 如果点击的是设备，切换到单设备视图
-      else if (data.type === 'device') {
+      else if (data.type === 'NE') {
         console.log('主视图中点击设备，切换到单设备视图:', data.name);
         this.createSingleDeviceScene(data);
       }
@@ -302,29 +581,6 @@ export default {
     handleSingleDeviceViewClick(data) {
       console.log('单设备视图中点击:', data.name, data.type);
       // 在单设备视图中可以实现其他交互，如部件动画等
-    },
-    
-    // 处理对象悬停事件
-    handleObjectHover(hoverData) {
-      // 在单机架视图中，不显示悬停提示
-      if (this.sceneState.currentView === 'single-rack' && !this.sceneState.showTooltipInSingleRack) {
-        // 清除之前的悬停对象
-        this.deviceInteractionState.hoveredDevice = null;
-        return;
-      }
-      
-      // 获取当前悬停的对象
-      const hoveredObject = hoverData.objectFound ? 
-        { name: hoverData.objectName, type: hoverData.objectType } : null;
-      
-      // 更新悬停设备信息
-      this.deviceInteractionState.hoveredDevice = hoveredObject;
-      
-      // 转发悬停事件到父组件
-      this.$emit('object-hover', {
-        ...hoverData,
-        hoveredObject
-      });
     },
     
     // 切换到正面视图
@@ -415,108 +671,75 @@ export default {
     
     // 高亮对象 - 覆盖基础组件方法
     highlightObject(object) {
-      if (!object.material) return;
-      
-      // 高亮设备对象
-      if (object.userData.type === 'device') {
-        this.deviceInteractionState.hoveredDevice = object.name;
-        
-        // 设置高亮颜色（浅蓝色）
-        const highlightColor = markRaw(new THREE.Color(0x66ccff));
-        
-        if (Array.isArray(object.material)) {
-          object.material.forEach(mat => {
-            if (mat.color) {
-              mat.color.set(highlightColor);
-              mat.emissive = markRaw(new THREE.Color(0x112233));
-            }
-          });
-        } else if (object.material.color) {
-          object.material.color.set(highlightColor);
-          object.material.emissive = markRaw(new THREE.Color(0x112233));
-        }
+      // 确保colorMap存在
+      if (!this.deviceInteractionState.colorMap) {
+        this.deviceInteractionState.colorMap = createColorMap();
       }
       
-      // 高亮机架对象
-      if (object.userData.type === 'rack') {
-        // 设置高亮颜色（浅绿色）
-        const highlightColor = markRaw(new THREE.Color(0x66ffcc));
+      // 保存原始颜色
+      saveOriginalColor(object, this.deviceInteractionState.colorMap);
+      
+      // 根据对象类型应用高亮颜色
+      if (isDevice(object)) {
+        // 设备高亮使用特定颜色
+        const deviceType = object.userData.type || "unknown";
+        //setDeviceHighlight(object, deviceType);
+        //setDeviceOutlineHighlight(object, deviceType);
         
-        if (Array.isArray(object.material)) {
-          object.material.forEach(mat => {
-            if (mat.color) {
-              mat.color.set(highlightColor);
-            }
-          });
-        } else if (object.material.color) {
-          object.material.color.set(highlightColor);
-        }
+        // 设置当前悬停的设备
+        this.deviceInteractionState.hoveredDevice = {
+          name: object.name,
+          object: object
+        };
+      } 
+      else if (object.name.includes('rack')) {
+        // 机架使用不同的高亮颜色
+        // setHighlightColor(object, HIGHLIGHT_COLORS.RACK, this.deviceInteractionState.colorMap);
+      } 
+      else {
+        // 其他对象使用通用高亮颜色
+        // setHighlightColor(object, HIGHLIGHT_COLORS.DEFAULT, this.deviceInteractionState.colorMap);
+        console.log('暂时不处理高亮')
       }
     },
     
     // 重置高亮 - 覆盖基础组件方法
     resetHighlight(object) {
-      if (!object.material) return;
-      
-      // 重置设备对象颜色
-      if (object.userData.type === 'device') {
-        this.deviceInteractionState.hoveredDevice = null;
-        
-        if (Array.isArray(object.material)) {
-          object.material.forEach((mat, index) => {
-            const originalColor = this.deviceInteractionState.originalColors.get(`${object.id}_${index}`);
-            if (mat.color && originalColor) {
-              mat.color.copy(originalColor);
-              mat.emissive = markRaw(new THREE.Color(0x000000));
-            }
-          });
-        } else if (object.material.color) {
-          const originalColor = this.deviceInteractionState.originalColors.get(object.id);
-          if (originalColor) {
-            object.material.color.copy(originalColor);
-            object.material.emissive = markRaw(new THREE.Color(0x000000));
-          }
-        }
+      // 确保colorMap存在
+      if (!this.deviceInteractionState.colorMap) {
+        this.deviceInteractionState.colorMap = createColorMap();
       }
       
-      // 重置机架对象颜色
-      if (object.userData.type === 'rack') {
-        if (Array.isArray(object.material)) {
-          object.material.forEach((mat, index) => {
-            const originalColor = this.deviceInteractionState.originalColors.get(`${object.id}_${index}`);
-            if (mat.color && originalColor) {
-              mat.color.copy(originalColor);
-            }
-          });
-        } else if (object.material.color) {
-          const originalColor = this.deviceInteractionState.originalColors.get(object.id);
-          if (originalColor) {
-            object.material.color.copy(originalColor);
-          }
-        }
+      // 恢复原始颜色
+      restoreOriginalColor(object, this.deviceInteractionState.colorMap);
+      
+      // 如果是当前悬停的设备，重置状态
+      if (this.deviceInteractionState.hoveredDevice && 
+          this.deviceInteractionState.hoveredDevice.object === object) {
+        this.deviceInteractionState.hoveredDevice = null;
       }
     },
     
-    // 创建单机架视图
-    createSingleRackScene(rackData) {
+    // 仅高亮网络设备
+    highlightNetworkElementOnly(object) {
+      // 确保colorMap存在
+      if (!this.deviceInteractionState.colorMap) {
+        this.deviceInteractionState.colorMap = createColorMap();
+      }
+      
+      // 保存原始颜色
+      saveOriginalColor(object, this.deviceInteractionState.colorMap);
+      
+      // 设置网络设备特定的高亮颜色
+      setHighlightColor(object, HIGHLIGHT_COLORS.NETWORK, this.deviceInteractionState.colorMap);
+    },
+    
+    // 创建单设备视图
+    createSingleDeviceScene(deviceData) {
       if (!this.$refs.baseScene || !this.$refs.baseScene.model) {
         console.error('缺少基础场景或模型引用');
         return false;
       }
-      
-      console.log('创建单机架视图，参数:', rackData);
-      
-      // 保存选中的机架信息
-      this.sceneState.selectedRack = rackData;
-      
-      // 查找选中的机架对象
-      const rackObject = this.getObjectByName(rackData.name);
-      if (!rackObject) {
-        console.error('找不到机架对象:', rackData.name);
-        return false;
-      }
-      
-      console.log('找到机架对象:', rackObject.name, '位置:', rackObject.position);
       
       // 记录当前的相机状态，以便之后返回
       if (!this.sceneState.originalCameraPosition) {
@@ -524,373 +747,44 @@ export default {
         this.sceneState.originalControlsTarget = this.$refs.baseScene.controls.target.clone();
       }
 
-      try {
-        // 获取当前场景和相机引用
-        const renderer = this.$refs.baseScene.renderer;
-        const mainScene = this.$refs.baseScene.scene;
-        const camera = this.$refs.baseScene.camera;
-        const controls = this.$refs.baseScene.controls;
-        
-        // 提取机架名称，用于匹配相关设备
-        let rackBaseName = '';
-        if (rackData.name.includes('Rack-')) {
-          rackBaseName = rackData.name.split('_')[0]; // 获取"Rack-XX"部分
-          console.log('提取的机架基本名称:', rackBaseName);
-        } else {
-          // 如果没有标准命名，使用整个名称
-          rackBaseName = rackData.name;
-        }
-        
-        // 临时保存原始场景
-        const originalModel = this.$refs.baseScene.model;
-        
-        // 创建新的场景
-        // 注意：我们不完全创建新的THREE.Scene，而是清空并重用现有场景，保留相机和控制器
-        const sceneChildren = [...mainScene.children];
-        sceneChildren.forEach(child => {
-          if (child !== this.$refs.baseScene.model && !child.isLight) {
-            mainScene.remove(child);
-          }
-        });
-        
-        // 1. 清除原始模型，并创建一个新的场景容器
-        mainScene.remove(originalModel);
-        
-        // 2. 创建新的场景容器
-        const sceneContainer = new THREE.Group();
-        mainScene.add(sceneContainer);
-        
-        // 3. 创建原点，用于放置机架和设备
-        const origin = new THREE.Group();
-        // 将整个机架组向上移动一点，避开底部黑色区域
-        origin.position.y = -0.2; // 向上移动一小段距离
-        sceneContainer.add(origin);
-        
-        // 4. 克隆机架并添加到新场景
-        const rackClone = rackObject.clone(true);
-        rackClone.position.set(0, 0, 0); // 重置位置到原点
-        origin.add(rackClone);
-        
-        // 5. 确保机架材质正确
-        rackClone.traverse((child) => {
-          if (child.isMesh && child.material) {
-            // 处理数组材质
-            if (Array.isArray(child.material)) {
-              child.material = child.material.map(mat => {
-                // 克隆材质确保独立性
-                const newMat = mat.clone();
-                // 确保不是黑色
-                if (newMat.color && newMat.color.r === 0 && newMat.color.g === 0 && newMat.color.b === 0) {
-                  newMat.color.setRGB(0.8, 0.8, 0.8);
-                }
-                return newMat;
-              });
-            } 
-            // 处理单个材质
-            else {
-              // 克隆材质确保独立性
-              child.material = child.material.clone();
-              if (child.material.color && 
-                  child.material.color.r === 0 && 
-                  child.material.color.g === 0 && 
-                  child.material.color.b === 0) {
-                child.material.color.setRGB(0.8, 0.8, 0.8);
-              }
-            }
-            
-            // 设置交互标记
-            child.userData.isInteractive = true;
-            child.userData.type = 'rack';
-            child.userData.originalMaterial = {
-              color: child.material.color ? child.material.color.clone() : new THREE.Color(0xcccccc),
-              opacity: child.material.opacity || 1.0,
-              transparent: child.material.transparent || false
-            };
-            
-            // 禁用阴影
-            child.castShadow = false;
-            child.receiveShadow = false;
-          }
-        });
-        
-        // 6. 保存原始机架位置，用于计算设备相对位置
-        const rackOriginalPosition = rackObject.position.clone();
-        
-        // 7. 查找并添加相关设备
-        let deviceCount = 0;
-        originalModel.traverse((child) => {
-          // 查找与该机架相关的设备
-          if (child.name && child.name.startsWith('NE_') && child.name.includes(rackBaseName)) {
-            console.log("找到设备:", child.name);
-            
-            // 克隆设备
-            const deviceClone = child.clone(true);
-            
-            // 计算设备相对于原始机架的偏移量
-            const relativePosition = new THREE.Vector3().subVectors(
-              child.position, 
-              rackOriginalPosition
-            );
-            
-            // 设置设备相对于机架的位置
-            deviceClone.position.copy(relativePosition);
-            
-            // 确保设备材质正确
-            deviceClone.traverse((subChild) => {
-              if (subChild.isMesh && subChild.material) {
-                // 处理数组材质
-                if (Array.isArray(subChild.material)) {
-                  subChild.material = subChild.material.map(mat => {
-                    // 克隆材质确保独立性
-                    const newMat = mat.clone();
-                    // 确保不是黑色
-                    if (newMat.color && newMat.color.r === 0 && newMat.color.g === 0 && newMat.color.b === 0) {
-                      newMat.color.setRGB(0.8, 0.8, 0.8);
-                    }
-                    return newMat;
-                  });
-                } 
-                // 处理单个材质
-                else {
-                  // 克隆材质确保独立性
-                  subChild.material = subChild.material.clone();
-                  if (subChild.material.color && 
-                      subChild.material.color.r === 0 && 
-                      subChild.material.color.g === 0 && 
-                      subChild.material.color.b === 0) {
-                    subChild.material.color.setRGB(0.8, 0.8, 0.8);
-                  }
-                }
-                
-                // 设置交互标记
-                subChild.userData.isInteractive = true;
-                subChild.userData.type = 'device';
-                subChild.userData.originalDevice = child.name;
-                subChild.userData.originalMaterial = {
-                  color: subChild.material.color ? subChild.material.color.clone() : new THREE.Color(0xcccccc),
-                  opacity: subChild.material.opacity || 1.0,
-                  transparent: subChild.material.transparent || false
-                };
-                
-                // 禁用阴影
-                subChild.castShadow = false;
-                subChild.receiveShadow = false;
-              }
-            });
-            
-            // 记录设备原始位置，用于后续动画
-            this.sceneState.currentDevicePositions.set(deviceClone.id, deviceClone.position.clone());
-            
-            // 添加到场景原点
-            origin.add(deviceClone);
-            deviceCount++;
-            
-            console.log(`添加设备到单机架视图: ${child.name}`);
-          }
-        });
-        
-        console.log(`添加了 ${deviceCount} 个设备到单机架视图`);
-        
-        // 8. 旋转整个原点以获得更好的视角
-        origin.rotation.y = Math.PI / 4; // 改为45度，以获得侧面视图效果
-        this.sceneState.isFrontView = false; // 初始设置为侧面视图
-        
-        // 9. 不添加额外灯光，保留原有灯光
-        // 原来的代码如下，现在注释掉：
-        /*
-        // 重新添加灯光，确保场景照明充足
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // 降低环境光强度
-        const mainLight = new THREE.DirectionalLight(0xffffff, 0.6); // 降低定向光强度
-        mainLight.position.set(5, 5, 5);
-        mainLight.castShadow = false;
-        
-        mainScene.add(ambientLight);
-        mainScene.add(mainLight);
-        */
-        
-        // 10. 调整相机视角
-        // 计算边界框，用于定位相机
-        const box = new THREE.Box3().setFromObject(sceneContainer);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
-        
-        // 计算适当的相机距离
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const fov = camera.fov * (Math.PI / 180);
-        const cameraDistance = (maxDim / 2) / Math.tan(fov / 2) * 1.2;
-        
-        // 设置相机位置 - 修改为更平行的视角（减少Y轴高度）
-        camera.position.set(
-          center.x, 
-          center.y + maxDim * 0.3, // 原来是0.7，现在降低为0.3，减少俯视角度
-          center.z + cameraDistance * 1.0 // 原来是0.8，现在增加到1.0，让相机距离更远一些
-        );
-        
-        // 设置相机目标 - 稍微调整目标点，让视线更加水平
-        controls.target.set(
-          center.x,
-          center.y + maxDim * 0.1 - 0.2, // 减去0.2以匹配机架的上移
-          center.z
-        );
-        controls.update();
-        
-        // 强制重绘场景
-        if (renderer) {
-          renderer.render(mainScene, camera);
-        }
-        
-        // 11. 更新当前视图状态
-        this.sceneState.currentView = 'single-rack';
-        this.sceneState.singleRackScene = sceneContainer;
-        
-        // 保存场景容器和原点引用，用于后续动画
-        this.sceneState.singleRackContainer = sceneContainer;
-        this.sceneState.singleRackOrigin = origin;
-        
-        // 12. 通知父组件视图已变更
-        this.$emit('view-changed', {
-          view: 'single-rack',
-          data: rackData
-        });
-        
-        console.log('单机架视图创建完成');
-        return true;
-      } catch (error) {
-        console.error('创建单机架视图时出错:', error);
-        return false;
-      }
+    // 构建上下文对象
+    const context = {
+      scene: this.$refs.baseScene.scene,
+      camera: this.$refs.baseScene.camera,
+      renderer: this.$refs.baseScene.renderer,
+      controls: this.$refs.baseScene.controls,
+      mainModel: this.$refs.baseScene.model,
+      getObjectByName: this.getObjectByName.bind(this),
+      setupDeviceInteractivity: this.setupDeviceInteractivity.bind(this),
+      sceneState: this.sceneState,
+      emitViewChanged: (data) => this.$emit('view-changed', data)
+    };
+    
+    // 调用composable中的实现
+    return this._createSingleDeviceScene(deviceData, context);
     },
     
-    // 创建单设备视图
-    createSingleDeviceScene(deviceData) {
-      if (!this.$refs.baseScene || !this.$refs.baseScene.model) return false;
-      
-      // 保存选中的设备信息
-      this.sceneState.selectedDevice = deviceData;
-      
-      // 查找选中的设备对象
-      const deviceObject = this.getObjectByName(deviceData.name);
-      if (!deviceObject) return false;
-      
-      console.log('创建单设备视图:', deviceData.name);
-      
-      // 记录当前的相机状态，以便之后返回
-      if (!this.sceneState.originalCameraPosition) {
-        this.sceneState.originalCameraPosition = this.$refs.baseScene.camera.position.clone();
-        this.sceneState.originalControlsTarget = this.$refs.baseScene.controls.target.clone();
-      }
-      
-      // 隐藏不相关的物体，只保留当前设备
-      this.model.traverse((child) => {
-        if (child.isMesh || child.isGroup) {
-          // 如果是当前设备或其子物体，则保持可见
-          if (child === deviceObject || this.isChildOfObject(child, deviceObject)) {
-            child.visible = true;
-          } 
-          // 不是当前设备的相关物体，则隐藏
-          else if (!child.name.toLowerCase().includes('floor') && 
-                  !child.name.toLowerCase().includes('wall') &&
-                  !child.name.toLowerCase().includes('ceiling')) {
-            child.visible = false;
-          }
-        }
-      });
-      
-      // 聚焦到设备
-      this.focusOnDevice(deviceData.name);
-      
-      // 更新当前视图状态
-      this.sceneState.currentView = 'single-device';
-      
-      // 不添加额外灯光，保持原有灯光设置
-      
-      // 通知父组件视图已变更
-      this.$emit('view-changed', {
-        view: 'single-device',
-        data: deviceData
-      });
-      
-      return true;
-    },
+    // 重置到主视图
+    resetDeviceView() {
+    // 构建上下文对象
+    const context = {
+      scene: this.$refs.baseScene.scene,
+      camera: this.$refs.baseScene.camera,
+      renderer: this.$refs.baseScene.renderer,
+      mainModel: this.$refs.baseScene.model,
+      sceneState: this.sceneState,
+      emitViewChanged: (data) => this.$emit('view-changed', data)
+    };
     
-    // 重置到主场景
-    resetToMainScene() {
-      console.log('重置到主场景');
-      
-      if (!this.$refs.baseScene) {
-        console.error('基础场景引用不存在');
-        return false;
-      }
-      
-      try {
-        // 获取当前场景和相机引用
-        const renderer = this.$refs.baseScene.renderer;
-        const mainScene = this.$refs.baseScene.scene;
-        const camera = this.$refs.baseScene.camera;
-        const controls = this.$refs.baseScene.controls;
-        
-        // 清空当前场景中的所有对象，包括灯光
-        const sceneChildren = [...mainScene.children];
-        sceneChildren.forEach(child => {
-          mainScene.remove(child);
-        });
-        
-        // 使用BaseThreeScene中的默认灯光
-        this.$refs.baseScene.setupLights();
-        
-        // 重新加载原始模型
-        this.loadModel()
-          .then(model => {
-            // 添加模型到场景
-            mainScene.add(model);
-            
-            // 处理模型对象，设置交互属性
-            this.processModel(model);
-            
-            // 重置相机位置
-            if (this.sceneState.originalCameraPosition && this.sceneState.originalControlsTarget) {
-              camera.position.copy(this.sceneState.originalCameraPosition);
-              controls.target.copy(this.sceneState.originalControlsTarget);
-              
-              controls.update();
-              
-              console.log('已恢复原始相机位置和目标');
-            } else {
-              // 如果没有保存原始相机位置，计算适当的新位置
-              this.resetCamera(camera, controls, model);
-            }
-            
-            // 更新当前视图状态
-            this.sceneState.currentView = 'main';
-            this.sceneState.selectedRack = null;
-            this.sceneState.selectedDevice = null;
-            this.sceneState.singleRackScene = null;
-            this.sceneState.singleDeviceScene = null;
-            
-            // 强制重绘场景
-            if (renderer) {
-              renderer.render(mainScene, camera);
-            }
-            
-            // 通知父组件视图已变更
-            this.$emit('view-changed', {
-              view: 'main',
-              data: null
-            });
-            
-            console.log('重置到主场景完成');
-            return true;
-          })
-          .catch(error => {
-            console.error('重新加载模型失败:', error);
-            return false;
-          });
-        
-        return true;
-      } catch (error) {
-        console.error('重置到主场景时出错:', error);
-        return false;
-      }
+    // 如果有保存的相机位置，恢复它
+    if (this.sceneState.originalCameraPosition) {
+      this.$refs.baseScene.camera.position.copy(this.sceneState.originalCameraPosition);
+      this.$refs.baseScene.controls.target.copy(this.sceneState.originalControlsTarget || new THREE.Vector3());
+      this.$refs.baseScene.controls.update();
+    }
+    
+    // 调用composable中的实现
+    return this.destroySingleDeviceScene(context);
     },
     
     // 加载模型辅助方法
@@ -934,25 +828,75 @@ export default {
           child.visible = true;
         }
         
-        // 使用优化的判断函数
-        if (this.isDevice(child)) {
-          console.log('标记为网元设备:', child.name);
-          child.userData.isInteractive = true;
-          child.userData.type = 'server'; 
+        // 使用设备工具函数
+        if (isDevice(child)) {
+          console.log('标记为设备:', child.name);
+          setupDeviceProperties(child);
           
-          // 可以进一步从名称中提取设备细节
-          const deviceDetails = this.extractDeviceDetails(child.name);
-          if (deviceDetails) {
-            child.userData.model = deviceDetails.model;
-            child.userData.position = deviceDetails.position;
-            // 其他设备细节...
+          // 兼容旧代码，确保NE_开头的设备类型正确
+          if (isNetworkElement(child.name) && (!child.userData.type || child.userData.type === 'device')) {
+            child.userData.type = DEVICE_TYPES.NE;
           }
         } else if (child.name.toLowerCase().includes('rack')) {
           // 机架对象
           child.userData.isInteractive = true;
-          child.userData.type = 'rack';
+          child.userData.type = DEVICE_TYPES.RACK;
         }
       });
+    },
+
+    // 重置到主视图
+    resetToMainScene() {
+      // 构建上下文对象
+      const context = {
+        scene: this.$refs.baseScene.scene,
+        camera: this.$refs.baseScene.camera,
+        renderer: this.$refs.baseScene.renderer,
+        controls: this.$refs.baseScene.controls,
+        mainModel: this.$refs.baseScene.model,
+        sceneState: this.sceneState,
+        emitViewChanged: (data) => this.$emit('view-changed', data)
+      };
+
+      // 如果有保存的相机位置，恢复它
+      if (this.sceneState.originalCameraPosition) {
+        this.$refs.baseScene.camera.position.copy(this.sceneState.originalCameraPosition);
+        this.$refs.baseScene.controls.target.copy(this.sceneState.originalControlsTarget || new THREE.Vector3());
+        this.$refs.baseScene.controls.update();
+      }
+
+      let result = false;
+      
+      // 根据当前视图类型，选择对应的重置方法
+      if (this.sceneState.currentView === 'single-rack') {
+        result = this.destroySingleRackScene(context);
+      } else if (this.sceneState.currentView === 'single-device') {
+        result = this.destroySingleDeviceScene(context);
+      }
+
+      // 清理直接事件处理
+      this.cleanupDirectEventHandling();
+
+      // 更新当前视图
+      this.sceneState.currentView = 'main';
+      
+      // 强制更新模型显示
+      if (this.$refs.baseScene.model) {
+        this.$refs.baseScene.model.visible = true;
+        // 遍历确保所有子对象可见
+        this.$refs.baseScene.model.traverse(child => {
+          if (child.visible !== undefined) {
+            child.visible = true;
+          }
+        });
+      }
+      
+      // 强制重渲染
+      if (this.$refs.baseScene.renderer && this.$refs.baseScene.camera) {
+        this.$refs.baseScene.renderer.render(this.$refs.baseScene.scene, this.$refs.baseScene.camera);
+      }
+
+      return result;
     },
     
     // 重置相机辅助方法
@@ -1222,118 +1166,156 @@ export default {
       window.animationFrameId = requestAnimationFrame(animate);
     },
     
-    // 动画设备（例如弹出或移动设备）
+    // 设备动画方法 - 对外暴露的接口
     animateDevice(deviceName) {
-      const device = this.getObjectByName(deviceName);
-      if (!device) {
-        console.error('找不到设备，无法执行动画:', deviceName);
+      console.log('执行设备弹出动画:', deviceName);
+      
+      // 查找设备对象
+      const deviceObj = this.findDeviceByName(deviceName);
+      if (!deviceObj) {
+        console.error('设备对象未找到:', deviceName);
         return false;
       }
       
-      console.log('执行设备动画:', deviceName, '对象:', device);
+      // 获取设备ID
+      const deviceId = deviceObj.userData.originalDevice || deviceObj.name;
       
-      // 重置之前的动画状态
-      if (this.sceneState.animatingDevice && 
-          this.sceneState.animatingDevice !== deviceName &&
-          this.sceneState.animatedDeviceParts.length > 0) {
-        this.resetPreviousDeviceAnimation();
+      // 查找同一设备ID下的所有部件
+      let deviceParts = [];
+      const targetScene = this.$refs.baseScene.scene;
+      
+      // 收集同一设备的所有部件
+      targetScene.traverse((obj) => {
+        if (obj.isMesh && (
+          obj === deviceObj || 
+          (obj.userData && obj.userData.originalDevice === deviceId) ||
+          (deviceObj.name.startsWith('NE_') && obj.name.includes(deviceObj.name.split('_')[2]))
+        )) {
+          deviceParts.push(obj);
+        }
+      });
+      
+      // 如果没有找到其他部件，就使用当前对象
+      if (deviceParts.length === 0) {
+        deviceParts = [deviceObj];
       }
       
-      // 执行第一阶段动画（设备弹出）
-      return this.animateDeviceStage1(device);
+      console.log(`找到设备 ${deviceId} 的 ${deviceParts.length} 个部件`);
+      
+      // 获取当前状态
+      const currentlySelectedDeviceObj = this.deviceInteractionState.selectedDevice;
+      const currentlySelectedParts = this.deviceInteractionState.deviceParts;
+      const currentStage = this.deviceInteractionState.interactionStage;
+      const isClickingSameDevice = currentlySelectedDeviceObj && 
+                                  (currentlySelectedDeviceObj === deviceObj || 
+                                   currentlySelectedDeviceObj.name === deviceObj.name);
+      
+      console.log('当前交互状态:', {
+        当前选中设备: currentlySelectedDeviceObj ? currentlySelectedDeviceObj.name : 'null',
+        当前交互阶段: currentStage,
+        是否点击同一设备: isClickingSameDevice
+      });
+      
+      if (isClickingSameDevice && currentStage === 1) {
+        // 点击同一设备且处于弹出状态：复位并清除状态
+        console.log('点击同一设备，执行复位');
+        this.resetDeviceAnimation(currentlySelectedDeviceObj, currentlySelectedParts);
+        
+        // 清除全局状态
+        this.deviceInteractionState.selectedDevice = null;
+        this.deviceInteractionState.deviceParts = [];
+        this.deviceInteractionState.interactionStage = 0;
+        
+        return true;
+        } else {
+        // 点击新设备或首次点击任何设备
+        
+        // 1. 复位之前的设备动画（如果有）
+        if (currentlySelectedDeviceObj && !isClickingSameDevice) {
+          console.log('先复位之前的设备:', currentlySelectedDeviceObj.name);
+          this.resetDeviceAnimation(currentlySelectedDeviceObj, currentlySelectedParts);
+        }
+        
+        // 2. 立即更新新设备的全局状态
+        this.deviceInteractionState.selectedDevice = deviceObj;
+        this.deviceInteractionState.deviceParts = deviceParts;
+        
+        // 3. 存储新设备的原始变换（在动画之前）
+        deviceParts.forEach(part => {
+          if (!part.userData.originalPosition) {
+            part.userData.originalPosition = part.position.clone();
+          }
+        });
+        
+        this.deviceInteractionState.interactionStage = 1;  // 设置状态为阶段1
+        
+        // 4. 执行新设备的弹出动画
+        console.log('执行新设备的弹出动画');
+        this.animateDeviceStage1(deviceObj, deviceParts);
+        
+        return true;
+      }
     },
     
-    // 设备动画 - 第一阶段（设备弹出）
-    animateDeviceStage1(deviceObj) {
-      if (!deviceObj) {
-        console.error('设备对象为空，无法执行动画');
-        return false;
+    // 设备弹出动画第一阶段 - 向前弹出
+    animateDeviceStage1(deviceObj, partsToAnimate) {
+      // 使用传入的部件或回退
+      const deviceParts = partsToAnimate || [deviceObj];
+      if (!deviceParts || deviceParts.length === 0) {
+        console.error("animateDeviceStage1: 没有可以动画的部件");
+        return;
       }
       
-      // 检查是否为网元设备，只处理网元设备
+      console.log(`开始执行设备弹出动画，有 ${deviceParts.length} 个部件需要处理`);
+      
+      // 确定设备的弹出方向 - 向前弹出 (Z轴正方向，即从屏幕向用户方向)
       const isNetworkElement = deviceObj.name && deviceObj.name.startsWith('NE_');
-      if (!isNetworkElement) {
-        console.log('非网元设备，不执行弹出动画:', deviceObj.name);
-        return false;
-      }
-      
-      console.log('执行网元设备第一阶段动画:', deviceObj.name);
-      
-      // 重置之前的动画状态
-      if (this.sceneState.animatingDevice && 
-          this.sceneState.animatingDevice !== deviceObj.name &&
-          this.sceneState.animatedDeviceParts.length > 0) {
-        this.resetPreviousDeviceAnimation();
-      }
-      
-      // 设置当前动画状态
-      this.sceneState.animatingDevice = deviceObj.name;
-      this.sceneState.deviceAnimationStage = 1;
-      
-      // 收集设备的所有部件
-      const deviceParts = [];
-      deviceObj.traverse((child) => {
-        if (child.isMesh && child !== deviceObj) {
-          deviceParts.push(child);
-        }
-      });
-      
-      // 如果没有部件，使用设备本身
-      if (deviceParts.length === 0) {
-        deviceParts.push(deviceObj);
-      }
-      
-      this.sceneState.animatedDeviceParts = deviceParts;
-      
-      // 保存原始位置
-      deviceParts.forEach(part => {
-        const originalPosition = part.position.clone();
-        this.deviceInteractionState.originalPositions.set(part.id, markRaw(originalPosition));
-      });
-      
-      // 确定动画方向
-      // 通常服务器设备是水平放置的，应该沿X轴移动
-      // 网络设备可能是垂直放置的，应该沿Z轴移动
-      const isServer = deviceObj.name.includes('server');
-      const isSwitch = deviceObj.name.includes('switch') || deviceObj.name.includes('router');
-      
-      // 分析设备的边界框来确定最佳移动方向
-      const box = new THREE.Box3().setFromObject(deviceObj);
-      const size = box.getSize(new THREE.Vector3());
-      
-      let moveAxis = 'x'; // 默认沿X轴移动
-      let moveDistance = 0.3; // 默认移动距离
-      
-      // 根据设备类型和尺寸确定移动轴向
-      if (isServer) {
-        // 服务器通常是水平放置的（X轴更长）
-        if (size.z > size.x) {
-          moveAxis = 'z';
-        } else {
-          moveAxis = 'x';
-        }
-        moveDistance = Math.min(size.x, size.z) * 0.5; // 移动设备尺寸的一半距离
-      } else if (isSwitch) {
-        // 交换机可能是垂直放置的（Y轴或Z轴更长）
-        if (size.y > size.x) {
-          moveAxis = 'y';
-        } else {
-          moveAxis = 'x';
-        }
-        moveDistance = Math.min(size.x, size.y) * 0.5;
-      }
-      
-      // 确保移动距离最小有0.2单位
-      moveDistance = Math.max(moveDistance, 0.2);
-      
-      console.log(`设备动画方向: ${moveAxis}, 距离: ${moveDistance}`);
-      
-      // 执行动画
-      const duration = 800; // 动画持续时间(毫秒)
+      const moveDistance = isNetworkElement ? 0.30 : 0.1; // 调整为更短的弹出距离
+      const duration = 500;     // 动画持续时间(毫秒)
       const startTime = Date.now();
       
-      // 保存开始位置
+      // 对每个部件应用高亮效果
+      deviceParts.forEach(part => {
+        if (part.material) {
+          if (Array.isArray(part.material)) {
+            part.material.forEach(mat => {
+              if (mat.color) {
+                // 记录原始颜色
+                if (!part.userData._originalColor) {
+                  part.userData._originalColor = mat.color.clone();
+                }
+                // 应用高亮颜色 - 淡蓝色
+                mat.color.setRGB(0.4, 0.8, 1.0);
+                // 如果材质支持发光效果
+                if (mat.emissive) {
+                  mat.emissive.setRGB(0.1, 0.2, 0.3);
+                }
+              }
+            });
+          } else if (part.material.color) {
+            // 记录原始颜色
+            if (!part.userData._originalColor) {
+              part.userData._originalColor = part.material.color.clone();
+            }
+            // 应用高亮颜色 - 淡蓝色
+            part.material.color.setRGB(0.4, 0.8, 1.0);
+            // 如果材质支持发光效果
+            if (part.material.emissive) {
+              part.material.emissive.setRGB(0.1, 0.2, 0.3);
+            }
+          }
+        }
+      });
+      
+      // 存储动画开始时的位置
       const startPositions = deviceParts.map(part => part.position.clone());
+      
+      // 存储每个部件的原始位置
+      deviceParts.forEach(part => {
+        if (!part.userData.originalPosition) {
+          part.userData.originalPosition = part.position.clone();
+        }
+      });
       
       const animate = () => {
         const elapsed = Date.now() - startTime;
@@ -1341,19 +1323,26 @@ export default {
         const easeProgress = this.easeOutCubic(progress);
         
         deviceParts.forEach((part, index) => {
-          const startPos = startPositions[index];
+          const originalPosition = part.userData.originalPosition; // 设备在机架内的原始位置
+          const startPosition = startPositions[index]; // 动画开始时的位置
           
-          // 根据移动轴向更新位置
-          if (moveAxis === 'x') {
-            part.position.x = startPos.x + moveDistance * easeProgress;
-          } else if (moveAxis === 'y') {
-            part.position.y = startPos.y + moveDistance * easeProgress;
-          } else {
-            part.position.z = startPos.z + moveDistance * easeProgress;
+          if (!originalPosition || !startPosition) {
+            console.warn("缺少部件的原始位置或起始位置:", part.name);
+            return;
           }
+          
+          // 向前弹出 - 使用Z轴正方向 (从屏幕向用户方向)
+          const targetZ = originalPosition.z + moveDistance; // 目标Z轴位置
+          
+          // 使用lerp平滑插值Z轴
+          part.position.z = startPosition.z + (targetZ - startPosition.z) * easeProgress;
+          
+          // 确保X和Y轴保持在原始位置
+          part.position.x = originalPosition.x;
+          part.position.y = originalPosition.y;
         });
         
-        // 强制重绘
+        // 强制渲染
         if (this.$refs.baseScene && this.$refs.baseScene.renderer) {
           this.$refs.baseScene.renderer.render(
             this.$refs.baseScene.scene,
@@ -1363,33 +1352,24 @@ export default {
         
         if (progress < 1) {
           requestAnimationFrame(animate);
-        } else {
-          console.log('设备第一阶段动画完成');
-          
-          // 动画完成后，设置一个计时器在一段时间后回到原位
-          setTimeout(() => {
-            this.resetDeviceAnimation();
-          }, 3000); // 3秒后复位
         }
       };
       
-      // 开始动画
-      requestAnimationFrame(animate);
-      
-      return true;
+      animate();
     },
     
-    // 重置设备动画
-    resetDeviceAnimation() {
-      if (!this.sceneState.animatedDeviceParts || this.sceneState.animatedDeviceParts.length === 0) {
+    // 重置设备动画 - 恢复到原始位置
+    resetDeviceAnimation(deviceObj, deviceParts) {
+      console.log('重置设备动画:', deviceObj ? deviceObj.name : '无');
+      
+      if (!deviceParts || deviceParts.length === 0) {
         return;
       }
       
-      const deviceParts = this.sceneState.animatedDeviceParts;
-      const duration = 500; // 回到原位的动画持续时间(毫秒)
+      const duration = 400;     // 复位动画持续时间(毫秒)
       const startTime = Date.now();
       
-      // 保存当前位置
+      // 存储动画开始时的位置
       const startPositions = deviceParts.map(part => part.position.clone());
       
       const animate = () => {
@@ -1398,18 +1378,42 @@ export default {
         const easeProgress = this.easeInOutCubic(progress);
         
         deviceParts.forEach((part, index) => {
-          const originalPos = this.deviceInteractionState.originalPositions.get(part.id);
-          const startPos = startPositions[index];
+          const originalPosition = part.userData.originalPosition; // 原始位置
+          const startPosition = startPositions[index]; // 动画开始时的位置
           
-          if (originalPos) {
-            // 平滑过渡回到原始位置
-            part.position.x = startPos.x + (originalPos.x - startPos.x) * easeProgress;
-            part.position.y = startPos.y + (originalPos.y - startPos.y) * easeProgress;
-            part.position.z = startPos.z + (originalPos.z - startPos.z) * easeProgress;
+          if (!originalPosition || !startPosition) {
+            return;
+          }
+          
+          // 计算当前位置 - 平滑过渡回原始位置
+          const currentX = startPosition.x + (originalPosition.x - startPosition.x) * easeProgress;
+          const currentY = startPosition.y + (originalPosition.y - startPosition.y) * easeProgress;
+          const currentZ = startPosition.z + (originalPosition.z - startPosition.z) * easeProgress;
+          
+          // 应用位置
+          part.position.set(currentX, currentY, currentZ);
+          
+          // 恢复原始颜色
+          if (part.material && part.userData._originalColor) {
+            if (Array.isArray(part.material)) {
+              part.material.forEach(mat => {
+                if (mat.color) {
+                  mat.color.copy(part.userData._originalColor);
+                  if (mat.emissive) {
+                    mat.emissive.setRGB(0, 0, 0);
+                  }
+                }
+              });
+            } else if (part.material.color) {
+              part.material.color.copy(part.userData._originalColor);
+              if (part.material.emissive) {
+                part.material.emissive.setRGB(0, 0, 0);
+              }
+            }
           }
         });
         
-        // 强制重绘
+        // 强制渲染
         if (this.$refs.baseScene && this.$refs.baseScene.renderer) {
           this.$refs.baseScene.renderer.render(
             this.$refs.baseScene.scene,
@@ -1421,34 +1425,116 @@ export default {
           requestAnimationFrame(animate);
         } else {
           console.log('设备动画复位完成');
-          
-          // 重置动画状态
-          this.sceneState.animatingDevice = null;
-          this.sceneState.deviceAnimationStage = 0;
-          this.sceneState.animatedDeviceParts = [];
         }
       };
       
-      // 开始复位动画
-      requestAnimationFrame(animate);
+      animate();
     },
     
-    // 重置之前的设备动画
-    resetPreviousDeviceAnimation() {
-      // 立即重置之前的动画，不使用过渡
-      const deviceParts = this.sceneState.animatedDeviceParts;
+    // 查找设备对象 - 增强版，支持通过子部件找到父级网元设备
+    findDeviceByName(deviceName) {
+      if (!this.$refs.baseScene || !this.$refs.baseScene.scene) {
+        console.error('场景未初始化，无法查找设备');
+        return null;
+      }
       
-      deviceParts.forEach(part => {
-        const originalPos = this.deviceInteractionState.originalPositions.get(part.id);
-        if (originalPos) {
-          part.position.copy(originalPos);
+      let foundDevice = null;
+      
+      // 尝试直接查找完整匹配
+      this.$refs.baseScene.scene.traverse(object => {
+        if (object.name === deviceName) {
+          foundDevice = object;
         }
       });
       
-      // 重置动画状态
-      this.sceneState.animatingDevice = null;
-      this.sceneState.deviceAnimationStage = 0;
-      this.sceneState.animatedDeviceParts = [];
+      // 如果找到了，直接返回
+      if (foundDevice) {
+        console.log('直接找到设备:', foundDevice.name);
+        return foundDevice;
+      }
+      
+      // 如果未找到，可能是子部件名称，尝试查找父级网元设备
+      // 先尝试查找精确匹配的子部件
+      let foundChild = null;
+      this.$refs.baseScene.scene.traverse(object => {
+        if (object.name === deviceName) {
+          foundChild = object;
+        }
+      });
+      
+      // 如果找到了子部件，向上查找其父级网元设备
+      if (foundChild) {
+        console.log('找到子部件:', foundChild.name, '开始查找父级网元设备');
+        
+        // 向上遍历查找父级，直到找到网元设备或达到根节点
+        let currentParent = foundChild.parent;
+        while (currentParent) {
+          // 检查是否为网元设备
+          if (currentParent.name && currentParent.name.startsWith('NE_')) {
+            console.log('找到父级网元设备:', currentParent.name);
+            return currentParent;
+          }
+          // 继续向上查找
+          currentParent = currentParent.parent;
+        }
+        
+        // 如果没有找到父级网元，返回子部件本身
+        console.log('未找到父级网元设备，返回子部件:', foundChild.name);
+        return foundChild;
+      }
+      
+      // 如果上述方法都没找到，尝试寻找匹配的网元设备（部分匹配）
+      if (deviceName.includes('Cube') || deviceName.includes('cube')) {
+        console.log('尝试根据Cube部件名称查找相关网元设备');
+        let networkElements = [];
+        
+        // 收集所有网元设备
+        this.$refs.baseScene.scene.traverse(object => {
+          if (object.name && object.name.startsWith('NE_')) {
+            networkElements.push(object);
+          }
+        });
+        
+        // 尝试查找包含此Cube的网元设备
+        for (const ne of networkElements) {
+          let hasMatchingChild = false;
+          ne.traverse(child => {
+            if (child.name === deviceName) {
+              hasMatchingChild = true;
+            }
+          });
+          
+          if (hasMatchingChild) {
+            console.log('通过子部件查找到网元设备:', ne.name);
+            return ne;
+          }
+        }
+      }
+      
+      // 如果是点击了网元名称的部分匹配 (例如NE_Rack-01_east)
+      if (deviceName.startsWith('NE_')) {
+        const devicePrefix = deviceName.split('_').slice(0, 3).join('_'); // 例如 NE_Rack-01_east
+        
+        // 尝试查找以此前缀开头的网元设备
+        let bestMatch = null;
+        
+        this.$refs.baseScene.scene.traverse(object => {
+          if (object.name && object.name.startsWith(devicePrefix)) {
+            // 如果还没有匹配或者当前对象的名称更长(更精确)
+            if (!bestMatch || object.name.length > bestMatch.name.length) {
+              bestMatch = object;
+            }
+          }
+        });
+        
+        if (bestMatch) {
+          console.log('通过前缀匹配找到网元设备:', bestMatch.name);
+          return bestMatch;
+        }
+      }
+      
+      console.warn('无法找到设备:', deviceName);
+      return null;
     },
     
     // 获取对象通过名称
@@ -1459,24 +1545,9 @@ export default {
       return this.$refs.baseScene.model.getObjectByName(name);
     },
     
-    // 优化的设备判断函数
     isDevice(object) {
-      if (!object) return false;
-      
-      // 条件1: 对象类型是device
-      if (object.type === 'device') return true;
-      
-      // 条件2: 名称以NE_开头（网元）
-      if (object.name && object.name.startsWith('NE_')) return true;
-      
-      // 条件3: 名称包含常见设备关键词
-      if (object.name) {
-        const lowerName = object.name.toLowerCase();
-        const deviceKeywords = ['server', 'switch', 'router', 'device', 'net', 'hw_'];
-        return deviceKeywords.some(keyword => lowerName.includes(keyword));
-      }
-      
-      return false;
+      // 直接使用工具函数，不再需要包装方法
+      return isDevice(object);
     },
     
     // 从名称中提取设备细节
@@ -1502,89 +1573,62 @@ export default {
       return null;
     },
     
-    // 高亮网元设备
-    highlightNetworkElementOnly(obj) {
-      if (!obj) return;
+    // 辅助方法：在场景中查找指定名称的对象
+    findObjectByName(name) {
+      if (!this.scene) return null;
       
-      // 检查是否为网元设备
-      const isNetworkElement = obj.name && obj.name.startsWith('NE_');
-      if (!isNetworkElement) {
-        console.log('非网元设备，不执行高亮:', obj.name);
-        return;
-      }
+      console.log(`[查找对象] 开始查找名称为 ${name} 的对象`);
+      let result = null;
       
-      console.log('高亮网元设备:', obj.name);
-      
-      // 首先清除之前的高亮效果
-      this.clearHighlights();
-      
-      // 保存当前对象的材质颜色
-      if (!obj.userData._highlightOriginalColor && obj.material && obj.material.color) {
-        obj.userData._highlightOriginalColor = obj.material.color.clone();
-      }
-      
-      if (obj.material) {
-        // 高亮效果 - 淡蓝色，降低强度避免过亮
-        const highlightColor = new THREE.Color(0x66ccff);
+      // 首先尝试在单机架容器中查找
+      if (this.sceneContainer) {
+        console.log(`[查找对象] 在单机架容器中查找`);
         
-        // 如果是数组材质
-        if (Array.isArray(obj.material)) {
-          obj.material.forEach(mat => {
-            if (mat.color) {
-              // 使用lerp而不是直接设置，保持部分原始颜色
-              mat.color.lerp(highlightColor, 0.3);
+        // 直接查找对象
+        result = this.sceneContainer.getObjectByName(name);
+        if (result) {
+          console.log(`[查找对象] 直接匹配成功`);
+          return result;
+        }
+        
+        // 如果直接查找不到，递归遍历查找
+        this.sceneContainer.traverse((obj) => {
+          if (obj.name === name) {
+            console.log(`[查找对象] 通过遍历找到匹配对象: ${obj.name}`);
+            result = obj;
+          }
+        });
+        
+        if (result) return result;
+        
+        // 如果还是找不到，尝试模糊匹配（可能名称有缺少或额外的前缀）
+        console.log(`[查找对象] 尝试模糊匹配`);
+        
+        // 获取不带前缀的名称部分
+        const simpleName = name.replace(/^.*?_/, '').trim();
+        if (simpleName && simpleName !== name) {
+          console.log(`[查找对象] 使用简化名称查找: ${simpleName}`);
+          
+          this.sceneContainer.traverse((obj) => {
+            if (obj.name && obj.name.includes(simpleName)) {
+              console.log(`[查找对象] 通过简化名称找到匹配对象: ${obj.name}`);
+              if (!result) result = obj;
             }
           });
         }
-        // 单个材质
-        else if (obj.material.color) {
-          // 使用lerp而不是直接设置，保持部分原始颜色
-          obj.material.color.lerp(highlightColor, 0.3);
-        }
-      }
-      
-      // 递归应用到所有子对象
-      if (obj.children && obj.children.length > 0) {
-        obj.children.forEach(child => {
-          // 保存子对象材质
-          if (child.isMesh && child.material && child.material.color) {
-            if (!child.userData._highlightOriginalColor) {
-              child.userData._highlightOriginalColor = child.material.color.clone();
-            }
-            
-            // 高亮子对象
-            const highlightColor = new THREE.Color(0x66ccff);
-            child.material.color.lerp(highlightColor, 0.3);
-          }
-          
-          // 递归处理深层子对象
-          if (child.children && child.children.length > 0) {
-            this.highlightChildObjects(child);
-          }
-        });
-      }
-    },
-    
-    // 递归高亮子对象（辅助方法）
-    highlightChildObjects(obj) {
-      if (!obj) return;
-      
-      if (obj.isMesh && obj.material && obj.material.color) {
-        if (!obj.userData._highlightOriginalColor) {
-          obj.userData._highlightOriginalColor = obj.material.color.clone();
-        }
         
-        // 高亮子对象
-        const highlightColor = new THREE.Color(0x66ccff);
-        obj.material.color.lerp(highlightColor, 0.3);
+        if (result) return result;
       }
       
-      // 递归处理深层子对象
-      if (obj.children && obj.children.length > 0) {
-        obj.children.forEach(child => {
-          this.highlightChildObjects(child);
-        });
+      // 如果在单机架容器中没找到，尝试在整个场景中查找
+      console.log(`[查找对象] 在整个场景中查找`);
+      result = this.scene.getObjectByName(name);
+      
+      if (!result) {
+        console.log(`[查找对象] 未找到名称为 ${name} 的对象`);
       }
+      
+      return result;
     },
     
     // 清除场景中所有对象的高亮效果
@@ -1612,69 +1656,928 @@ export default {
       });
     },
     
-    // 指针悬停处理
-    onPointerOver(event) {
-      // 计算指针位置
-      this.pointer.x = (event.offsetX / this.width) * 2 - 1;
-      this.pointer.y = -(event.offsetY / this.height) * 2 + 1;
+    // 直接处理鼠标移动事件，基于旧版本的onModelHover方法
+    // onDirectMouseMove(event) {
+    //   // 计算鼠标在容器中的相对位置
+    //   if (!this.hoverState.container || !this.scene) return;
       
-      // 对不同视图进行不同处理
-      if (this.currentView === 'single-rack') {
-        // 在单机架视图中，高亮悬停的网元设备
-        this.raycaster.setFromCamera(this.pointer, this.camera);
-        const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+    //   const rect = this.hoverState.container.getBoundingClientRect();
+      
+    //   // 归一化坐标 (-1 到 1)
+    //   this.hoverState.mouse.x = ((event.clientX - rect.left) / this.hoverState.containerWidth) * 2 - 1;
+    //   this.hoverState.mouse.y = -((event.clientY - rect.top) / this.hoverState.containerHeight) * 2 + 1;
+      
+    //   // 设置射线投射器的起点和方向
+    //   this.hoverState.raycaster.setFromCamera(this.hoverState.mouse, this.camera);
+      
+    //   // 在检测前强制更新所有对象的世界矩阵，解决位置检测不准确的问题
+    //   if (this.currentView === 'single-rack' && this.sceneContainer) {
+    //     this.sceneContainer.updateMatrixWorld(true); // 递归更新所有子对象的世界矩阵
+    //     console.log('[直接检测] 更新世界矩阵');
+    //   }
+      
+    //   // 执行射线投射，获取所有相交的物体
+    //   let intersects = this.hoverState.raycaster.intersectObjects(this.scene.children, true);
+      
+    //   // 调试信息
+    //   console.log(`[直接检测] 射线检测到 ${intersects.length} 个相交对象`);
+    //   if (intersects.length > 0) {
+    //     console.log(`[直接检测] 第一个相交对象: ${intersects[0].object.name}`);
+    //   }
+      
+    //   const previousHoveredObject = this.hoverState.hoveredObject;
+    //   let currentHoveredObject = null;
+    //   let tooltipContent = null;
+    //   let tooltipPosition = { x: event.clientX, y: event.clientY };
+      
+    //   // 查找第一个可交互的物体
+    //   for (let i = 0; i < intersects.length; i++) {
+    //     const intersectedObject = intersects[i].object;
         
-        if (intersects.length > 0) {
-          const obj = intersects[0].object;
-          // 向上查找可交互设备
-          let deviceObj = obj;
-          while (deviceObj && !(deviceObj.userData && deviceObj.userData.isInteractive)) {
-            deviceObj = deviceObj.parent;
+    //     // 查找当前物体或其父级是否为设备
+    //     let currObj = intersectedObject;
+    //     let foundDevice = null;
+        
+    //     // 向上查找设备对象
+    //     const maxLevels = 10; // 限制向上查找的层级数以避免无限循环
+    //     let level = 0;
+        
+    //     while (currObj && level < maxLevels) {
+    //       // 使用工具函数判断是否是设备
+    //       if (currObj.userData && (isDevice(currObj) || isNetworkElement(currObj))) {
+    //         foundDevice = currObj;
+    //         // 添加调试信息
+    //         console.log(`[直接检测] 发现设备: ${currObj.name}，层级: ${level}，是网络设备: ${isNetworkElement(currObj)}, userData:`, JSON.stringify(currObj.userData));
+    //         break;
+    //       }
+          
+    //       // 检查该对象是否有特定标记表明它是可交互的
+    //       if (currObj.userData && currObj.userData.isInteractive) {
+    //         foundDevice = currObj;
+    //         console.log(`[直接检测] 发现可交互对象: ${currObj.name}, userData:`, JSON.stringify(currObj.userData));
+    //         break;
+    //       }
+          
+    //       // 向上移动到父级
+    //       currObj = currObj.parent;
+    //       level++;
+    //     }
+        
+    //     // 如果找到设备，则更新悬停状态
+    //     if (foundDevice) {
+    //       currentHoveredObject = foundDevice;
+          
+    //       // 格式化显示名称
+    //       const displayName = formatDeviceName(foundDevice.name);
+          
+    //       // 获取或生成设备状态信息
+    //       const deviceStatus = foundDevice.userData.status || '正常';
+    //       const deviceTemp = foundDevice.userData.temperature || (20 + Math.floor(Math.random() * 15));
+    //       const deviceLoad = foundDevice.userData.load || Math.floor(Math.random() * 100);
+          
+    //       // 根据设备类型构建不同的工具提示内容
+    //       if (isNetworkElement(foundDevice)) {
+    //         tooltipContent = {
+    //           name: foundDevice.name,
+    //           displayName: displayName,
+    //           type: '网络设备',
+    //           status: deviceStatus,
+    //           temperature: deviceTemp,
+    //           load: deviceLoad
+    //         };
+    //       } else if (isDevice(foundDevice)) {
+    //         tooltipContent = {
+    //           name: foundDevice.name,
+    //           displayName: displayName,
+    //           type: '服务器',
+    //           status: deviceStatus,
+    //           temperature: deviceTemp,
+    //           cpuLoad: deviceLoad
+    //         };
+    //       } else {
+    //         tooltipContent = {
+    //           name: foundDevice.name,
+    //           displayName: displayName,
+    //           type: '其他设备',
+    //           status: deviceStatus
+    //         };
+    //       }
+          
+    //       // 高亮显示当前对象
+    //       this.highlightObject(foundDevice);
+    //       break;
+    //     }
+    //   }
+      
+    //   // 如果没有找到可交互的物体，清除高亮
+    //   if (!currentHoveredObject) {
+    //     this.clearHighlights();
+    //   }
+      
+    //   // 如果悬停物体发生变化，触发事件
+    //   if (previousHoveredObject !== currentHoveredObject) {
+    //     // 记录当前悬停的物体
+    //     this.hoverState.hoveredObject = currentHoveredObject;
+        
+    //     // 更新工具提示状态
+    //     this.hoverState.tooltipContent = tooltipContent;
+    //     this.hoverState.tooltipPosition = tooltipPosition;
+        
+    //     // 触发事件
+    //     if (tooltipContent) {
+    //       console.log(`[直接检测] 发出悬停事件: ${tooltipContent.displayName}`);
+    //       this.$emit('object-hover', {
+    //         x: tooltipPosition.x,
+    //         y: tooltipPosition.y,
+    //         object: currentHoveredObject,
+    //         tooltipContent: tooltipContent
+    //       });
+    //     } else {
+    //       // 发出空悬停事件，隐藏工具提示
+    //       this.$emit('object-hover', {
+    //         x: tooltipPosition.x,
+    //         y: tooltipPosition.y,
+    //         object: null,
+    //         tooltipContent: null
+    //       });
+    //     }
+    //   }
+    // },
+    
+    // 从ServerRoom.vue中移植的清理方法
+    disposeScene(scene) {
+      if (!scene) return;
+      
+      console.log('清理场景资源');
+      scene.traverse((object) => {
+        // 清理几何体
+        if (object.geometry) {
+          object.geometry.dispose();
+        }
+        
+        // 清理材质
+        if (object.material) {
+          // 处理材质数组
+          if (Array.isArray(object.material)) {
+            object.material.forEach(material => this.disposeMaterial(material));
+          } else {
+            // 处理单个材质
+            this.disposeMaterial(object.material);
+          }
+        }
+        
+        // 清理其他属性
+        if (object.dispose && typeof object.dispose === 'function') {
+          object.dispose();
+        }
+      });
+    },
+    
+    // 辅助函数：清理材质及其贴图资源
+    disposeMaterial(material) {
+      if (!material) return;
+      
+      // 清理材质的所有纹理资源
+      if (material.map) material.map.dispose();
+      if (material.lightMap) material.lightMap.dispose();
+      if (material.bumpMap) material.bumpMap.dispose();
+      if (material.normalMap) material.normalMap.dispose();
+      if (material.displacementMap) material.displacementMap.dispose();
+      if (material.specularMap) material.specularMap.dispose();
+      if (material.envMap) material.envMap.dispose();
+      
+      // 通用遍历所有可能的纹理属性
+      for (const key in material) {
+        const value = material[key];
+        if (value && value.isTexture) {
+          value.dispose();
+        }
+      }
+      
+      // 清理材质本身
+      material.dispose();
+    },
+    
+    // 窗口大小调整处理
+    onWindowResize() {
+      console.log('窗口大小改变');
+    },
+    
+    // 初始化直接事件处理
+    initializeDirectEventHandling() {
+      // 避免重复初始化
+      //if (this.directEventState.initialized) {
+        //return;
+      //}
+      
+      // 确保容器元素存在
+      //const container = document.getElementById('three-container');
+      //if (!container) {
+        //console.error('无法找到three-container元素，无法初始化直接事件处理');
+        //return;
+      //}
+      
+      //console.log('初始化直接事件处理系统');
+      
+      // 初始化射线和鼠标向量
+      //this.directEventState.raycaster = new THREE.Raycaster();
+      //this.directEventState.mouse = new THREE.Vector2();
+      
+      // 添加鼠标移动事件监听器
+      //container.addEventListener('mousemove', this.onDirectMouseMove);
+      
+      // 标记为已初始化
+      //this.directEventState.initialized = true;
+      console.log('交互系统自动管理事件处理')
+    },
+    
+    // 清理直接事件处理
+    cleanupDirectEventHandling() {
+      console.log('清理交互系统')
+      //if (!this.directEventState.initialized) {
+        //return;
+      //}
+      
+      //console.log('清理直接事件处理系统');
+      
+      // 移除事件监听器
+      //const container = document.getElementById('three-container');
+      //if (container) {
+        //container.removeEventListener('mousemove', this.onDirectMouseMove);
+      //}
+      
+      // 重置事件状态
+      //this.directEventState.initialized = false;
+      //this.directEventState.hoveredObject = null;
+      //this.directEventState.lastIntersection = null;
+    },
+    
+    // 直接处理鼠标移动事件
+    // _onDirectMouseMove(event) {
+    //   if (!this.$refs.baseScene) return;
+      
+    //   const scene = this.$refs.baseScene.scene;
+    //   const camera = this.$refs.baseScene.camera;
+    //   if (!scene || !camera) return;
+      
+    //   // 更新鼠标位置
+    //   this._updateMousePosition(event);
+      
+    //   // 更新射线发射器
+    //   this.directEventState.raycaster.setFromCamera(this.directEventState.mouse, camera);
+      
+    //   // 强制更新矩阵，确保射线检测准确
+    //   if (this.sceneState.currentView === 'single-rack' && this.sceneState.singleRackContainer) {
+    //     this.sceneState.singleRackContainer.updateMatrixWorld(true);
+    //   }
+      
+    //   // 执行射线检测
+    //   const intersects = this.directEventState.raycaster.intersectObjects(scene.children, true);
+    //   this.directEventState.lastIntersection = intersects;
+      
+    //   // 清除之前的高亮
+    //   this._clearAllHighlights();
+      
+    //   // 根据当前视图选择处理方法
+    //   if (this.sceneState.currentView === 'single-rack') {
+    //     this._handleSingleRackHover(intersects, event);
+    //   } else if (this.sceneState.currentView === 'single-device') {
+    //     this._handleSingleDeviceHover(intersects, event);
+    //   } else {
+    //     this._handleMainViewHover(intersects, event);
+    //   }
+    // },
+    
+    // 辅助方法：更新鼠标位置
+    _updateMousePosition(event) {
+      const container = this.directEventState.container;
+      if (!container) return;
+      
+      const rect = container.getBoundingClientRect();
+      this.directEventState.mouse.x = ((event.clientX - rect.left) / container.clientWidth) * 2 - 1;
+      this.directEventState.mouse.y = -((event.clientY - rect.top) / container.clientHeight) * 2 + 1;
+    },
+    
+    // 辅助方法：处理单机架视图的悬停
+    _handleSingleRackHover(intersects, event) {
+      if (intersects.length === 0) {
+        // 没有相交对象，清除状态
+        this._emitHoverEvent({ 
+          x: event.clientX, 
+          y: event.clientY, 
+          objectFound: false 
+        });
+        return;
+      }
+      
+      // 从相交点开始向上查找可交互对象
+      const obj = intersects[0].object;
+      let deviceObj = obj;
+      let foundInteractive = false;
+      
+      // 向上查找可交互对象 - 采用老版本的稳定查找方式
+      while (deviceObj) {
+        if (deviceObj.userData && deviceObj.userData.isInteractive) {
+          foundInteractive = true;
+          console.log(`[单机架悬停] 找到可交互对象: ${deviceObj.name}`);
+          
+          // 确定设备类型并进行高亮
+          if (this._isNetworkElement(deviceObj)) {
+            this._highlightNetworkElement(deviceObj);
+          } else {
+            this._highlightDevice(deviceObj);
           }
           
-          // 如果找到了可交互设备，检查是否为网元设备
-          if (deviceObj && deviceObj.userData && deviceObj.userData.isInteractive) {
-            // 检查是否为网元设备
-            const isNetworkElement = deviceObj.name && deviceObj.name.startsWith('NE_');
-            if (isNetworkElement) {
-              // 只高亮网元设备
-              this.highlightNetworkElementOnly(deviceObj);
+          // 发送悬停事件
+          this._emitHoverEvent({
+            x: event.clientX,
+            y: event.clientY,
+            objectFound: true,
+            objectName: deviceObj.name,
+            objectType: deviceObj.userData.type || 'unknown'
+          });
+          
+          // 更新悬停状态
+          this.directEventState.hoveredObject = deviceObj;
+          break;
+        }
+        
+        // 继续向上查找
+        if (!deviceObj.parent) break;
+        deviceObj = deviceObj.parent;
+      }
+      
+      // 如果没有找到可交互对象
+      if (!foundInteractive) {
+        this._emitHoverEvent({ 
+          x: event.clientX, 
+          y: event.clientY, 
+          objectFound: false 
+        });
+        this.directEventState.hoveredObject = null;
+      }
+    },
+    
+    // 直接处理鼠标点击事件
+    _onDirectMouseClick(event) {
+      if (!this.$refs.baseScene) return;
+      
+      // 使用上次鼠标移动事件中的相交结果
+      const intersects = this.directEventState.lastIntersection;
+      if (!intersects || intersects.length === 0) return;
+      
+      // 根据当前视图处理点击
+      if (this.sceneState.currentView === 'single-rack') {
+        this._handleSingleRackClick(intersects, event);
+      } else if (this.sceneState.currentView === 'single-device') {
+        this._handleSingleDeviceClick(intersects, event);
+      } else {
+        this._handleMainViewClick(intersects, event);
+      }
+    },
+    
+    // 辅助方法：处理单机架视图中的点击
+    _handleSingleRackClick(intersects) {
+      const obj = intersects[0].object;
+      let deviceObj = obj;
+      
+      // 查找可交互对象
+      while (deviceObj) {
+        if (deviceObj.userData && deviceObj.userData.isInteractive) {
+          
+          // 发送点击事件
+          this.$emit('object-clicked', {
+            name: deviceObj.name,
+            type: deviceObj.userData.type || 'unknown',
+            position: {
+              x: intersects[0].point.x,
+              y: intersects[0].point.y,
+              z: intersects[0].point.z
             }
+          });
+          
+          break;
+        }
+        
+        if (!deviceObj.parent) break;
+        deviceObj = deviceObj.parent;
+      }
+    },
+    
+    // 辅助方法：判断对象是否为网络元素
+    _isNetworkElement(obj) {
+      return (obj.userData && obj.userData.type === 'NE') || 
+             (obj.name && obj.name.startsWith('NE_'));
+    },
+    
+    // 辅助方法：高亮网络元素
+    _highlightNetworkElement(obj) {
+      const highlightColor = new THREE.Color(0x00ffff); // 青色
+      const emissiveColor = new THREE.Color(0x003333); // 轻微发光效果
+      
+      obj.traverse((child) => {
+        if (child.isMesh && child.material) {
+          // 保存原始颜色
+          if (!child.userData) child.userData = {};
+          if (!child.userData._highlightOriginalColor && child.material.color) {
+            child.userData._highlightOriginalColor = child.material.color.clone();
+          }
+          
+          // 应用高亮
+          if (Array.isArray(child.material)) {
+            child.material.forEach(mat => {
+              if (mat.color) {
+                mat.color.copy(highlightColor);
+                mat.emissive = emissiveColor;
+                mat.opacity = 1.0;
+                mat.transparent = true;
+              }
+            });
+          } else if (child.material.color) {
+            child.material.color.copy(highlightColor);
+            child.material.emissive = emissiveColor;
+            child.material.opacity = 1.0;
+            child.material.transparent = true;
+          }
+        }
+      });
+    },
+    
+    // 辅助方法：高亮普通设备
+    _highlightDevice(obj) {
+      const highlightColor = new THREE.Color(0x66ccff); // 浅蓝色
+      
+      obj.traverse((child) => {
+        if (child.isMesh && child.material) {
+          // 保存原始颜色
+          if (!child.userData) child.userData = {};
+          if (!child.userData._highlightOriginalColor && child.material.color) {
+            child.userData._highlightOriginalColor = child.material.color.clone();
+          }
+          
+          // 应用高亮
+          if (Array.isArray(child.material)) {
+            child.material.forEach(mat => {
+              if (mat.color) {
+                mat.color.copy(highlightColor);
+              }
+            });
+          } else if (child.material.color) {
+            child.material.color.copy(highlightColor);
+          }
+        }
+      });
+    },
+    
+    // 辅助方法：清除所有高亮
+    _clearAllHighlights() {
+      const scene = this.$refs.baseScene.scene;
+      if (!scene) return;
+      
+      scene.traverse((obj) => {
+        if (obj.isMesh && obj.material && obj.userData && obj.userData._highlightOriginalColor) {
+          // 恢复原始颜色
+          if (Array.isArray(obj.material)) {
+            obj.material.forEach(mat => {
+              if (mat.color) {
+                mat.color.copy(obj.userData._highlightOriginalColor);
+                if (mat.emissive) mat.emissive.set(0, 0, 0);
+              }
+            });
+          } else if (obj.material.color) {
+            obj.material.color.copy(obj.userData._highlightOriginalColor);
+            if (obj.material.emissive) obj.material.emissive.set(0, 0, 0);
+          }
+          
+          // 清除保存的原始颜色
+          delete obj.userData._highlightOriginalColor;
+        }
+      });
+    },
+    
+    // 辅助方法：发送悬停事件
+    _emitHoverEvent(data) {
+      this.$emit('object-hover', data);
+    },
+    
+    // 处理主视图悬停 - 暂时保持简单实现
+    _handleMainViewHover(intersects, event) {
+      // 直接传递事件数据
+      if (intersects.length === 0) {
+        this._emitHoverEvent({ 
+          x: event.clientX, 
+          y: event.clientY, 
+          objectFound: false 
+        });
+        return;
+      }
+      
+      // 简单实现，使用第一个相交对象
+      const obj = intersects[0].object;
+      this._emitHoverEvent({ 
+        x: event.clientX, 
+        y: event.clientY, 
+        objectFound: true,
+        objectName: obj.name,
+        objectType: obj.userData && obj.userData.type ? obj.userData.type : 'unknown'
+      });
+    },
+    
+    // 处理单设备视图悬停 - 暂时保持简单实现
+    _handleSingleDeviceHover(intersects, event) {
+      // 直接使用主视图相同的处理方式
+      this._handleMainViewHover(intersects, event);
+    },
+    
+    // 处理主视图点击 - 暂时保持简单实现
+    _handleMainViewClick(intersects) {
+      if (intersects.length === 0) return;
+      
+      // 简单实现，使用第一个相交对象
+      const obj = intersects[0].object;
+      this.$emit('object-clicked', {
+        name: obj.name,
+        type: obj.userData && obj.userData.type ? obj.userData.type : 'unknown',
+        position: {
+          x: intersects[0].point.x,
+          y: intersects[0].point.y,
+          z: intersects[0].point.z
+        }
+      });
+    },
+    
+    // 处理单设备视图点击 - 暂时保持简单实现
+    _handleSingleDeviceClick(intersects, event) {
+      // 直接使用主视图相同的处理方式
+      this._handleMainViewClick(intersects, event);
+    },
+    
+    /**
+     * 处理直接悬停逻辑
+     * @param {Array} intersects 射线检测的相交结果
+     */
+    _handleDirectHover(intersects) {
+      // 重置之前的高亮
+      if (this.directEventState.hoveredObject) {
+        this.resetHighlight(this.directEventState.hoveredObject);
+        this.directEventState.hoveredObject = null;
+      }
+      
+      // 查找第一个可交互的对象
+      const interactiveObject = this._findInteractiveObject(intersects);
+      
+      // 如果找到可交互对象
+      if (interactiveObject) {
+        // 高亮对象
+        this.directEventState.hoveredObject = interactiveObject;
+        
+        // 根据对象类型进行高亮
+        if (this._isDeviceOrRack(interactiveObject)) {
+          this.highlightObject(interactiveObject);
+        } else if (this.isRackNetworkElement(interactiveObject) && this.currentView === 'single-rack') {
+          this.highlightNetworkElementOnly(interactiveObject);
+        }
+        
+        // 发送悬停事件
+        this.$emit('object-hover', {
+          object: interactiveObject,
+          point: intersects[0].point,
+          view: this.currentView
+        });
+      }
+    },
+    
+    /**
+     * 查找第一个可交互的对象
+     * @param {Array} intersects 射线检测的相交结果
+     * @returns {Object|null} 找到的可交互对象或null
+     */
+    _findInteractiveObject(intersects) {
+      // 如果没有相交结果，返回null
+      if (!intersects || intersects.length === 0) {
+        return null;
+      }
+      
+      // 按照距离排序
+      const sortedIntersects = [...intersects].sort((a, b) => a.distance - b.distance);
+      
+      // 查找第一个可交互对象
+      for (const intersection of sortedIntersects) {
+        let obj = intersection.object;
+        
+        // 向上遍历父级，查找可交互对象
+        while (obj) {
+          // 检查是否为设备或机柜
+          if (this._isDeviceOrRack(obj)) {
+            return obj;
+          }
+          
+          // 检查是否为网络元素
+          if (this.isRackNetworkElement(obj) && this.currentView === 'single-rack') {
+            return obj;
+          }
+          
+          // 查找父对象
+          obj = obj.parent;
+        }
+      }
+      
+      return null;
+    },
+    
+    /**
+     * 判断对象是否为设备或机柜
+     * @param {Object} object THREE.js对象
+     * @returns {boolean} 是否为设备或机柜
+     */
+    _isDeviceOrRack(object) {
+      if (!object) return false;
+      
+      // 检查对象名称
+      const name = object.name || '';
+      if (name.includes('rack') || name.includes('Rack')) {
+        return true;
+      }
+      
+      // 检查userData
+      const userData = object.userData || {};
+      if (userData.isDevice || userData.isRack) {
+        return true;
+      }
+      
+      // 使用现有的判断函数
+      if (typeof this.isDevice === 'function' && this.isDevice(object)) {
+        return true;
+      }
+      
+      return false;
+    },
+    
+    // 处理对象悬停事件
+    handleObjectHover(data) {
+      console.log(`[ServerRoomScene] 收到悬停事件，当前视图: ${this.currentView}`);
+      
+      // 清除之前的高亮，无论哪种视图
+      if (this.deviceInteractionState.lastHighlightedObject) {
+        this.resetHighlight(this.deviceInteractionState.lastHighlightedObject);
+        this.deviceInteractionState.lastHighlightedObject = null;
+      }
+      
+      // 在单机架视图中处理悬停
+      if (this.currentView === 'single-rack') {
+        // 检查是否有交互对象
+        if (data && data.object) {
+          console.log(`[ServerRoomScene] 单机架视图中悬停在对象: ${data.object.name}`);
+          
+          // 使用网络设备特有高亮效果 
+          this.highlightNetworkElementOnly(data.object);
+          
+          // 记录最后高亮的对象
+          this.deviceInteractionState.lastHighlightedObject = data.object;
+        }
+      }
+      // 主视图中的悬停处理
+      else if (this.currentView === 'main' && data && data.object) {
+        console.log(`[ServerRoomScene] 主视图中悬停在对象: ${data.object.name}`);
+        
+        // 使用标准高亮处理
+        // this.highlightObject(data.object);
+        
+        // 记录最后高亮的对象
+        this.deviceInteractionState.lastHighlightedObject = data.object;
+      }
+      
+      // 无论哪种视图，都发送悬停事件数据
+      this.$emit('object-hover', data);
+    },
+    
+    // 辅助方法：应用材质到克隆对象
+    _applyMaterialsToClone(clone, original) {
+      if (!clone || !original) return;
+      
+      // 处理当前对象的材质
+      if (clone.material) {
+        if (Array.isArray(clone.material)) {
+          // 处理多材质数组
+          clone.material = clone.material.map((mat) => {
+            if (!mat) return null;
+            const newMat = mat.clone();
+            
+            // 确保颜色不是黑色（这可能是默认值）
+            if (newMat.color && newMat.color.r === 0 && newMat.color.g === 0 && newMat.color.b === 0) {
+              newMat.color.setRGB(0.8, 0.8, 0.8);
+            }
+            
+            // 确保半透明设置正确
+            newMat.transparent = newMat.opacity < 1.0;
+            
+            return newMat;
+          });
+        } else if (clone.material) {
+          // 处理单一材质
+          const newMat = clone.material.clone();
+          
+          // 确保颜色不是黑色
+          if (newMat.color && newMat.color.r === 0 && newMat.color.g === 0 && newMat.color.b === 0) {
+            newMat.color.setRGB(0.8, 0.8, 0.8);
+          }
+          
+          // 确保半透明设置正确
+          newMat.transparent = newMat.opacity < 1.0;
+          
+          clone.material = newMat;
+        }
+      }
+      
+      // 设置交互标记
+      if (!clone.userData) clone.userData = {};
+      clone.userData.isInteractive = true;
+      
+      // 确定类型
+      if (!clone.userData.type) {
+        if (clone.name.includes('rack')) {
+          clone.userData.type = 'rack';
+        } else if (clone.name.startsWith('NE_')) {
+          clone.userData.type = 'NE';
+        } else if (isDevice(clone)) {
+          clone.userData.type = 'device';
+        }
+      }
+      
+      // 递归处理子对象
+      if (clone.children && clone.children.length > 0) {
+        for (let i = 0; i < clone.children.length; i++) {
+          const childClone = clone.children[i];
+          const childOriginal = original.children[i];
+          
+          if (childClone && childOriginal) {
+            this._applyMaterialsToClone(childClone, childOriginal);
           }
         }
       }
-      // 其他视图处理可以按需添加...
     },
+    
+    // 辅助方法：为机架视图设置相机位置
+    _positionCameraForRackView() {
+      if (!this.$refs.baseScene || !this.sceneState.singleRackScene) return;
+      
+      const camera = this.$refs.baseScene.camera;
+      const controls = this.$refs.baseScene.controls;
+      
+      // 计算边界框，用于定位相机
+      const box = new THREE.Box3().setFromObject(this.sceneState.singleRackScene);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      
+      // 计算适当的相机距离
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const fov = camera.fov * (Math.PI / 180);
+      const cameraDistance = (maxDim / 2) / Math.tan(fov / 2) * 1.2;
+      
+      // 设置相机位置 - 侧视角
+      camera.position.set(
+        center.x + cameraDistance * 0.5, 
+        center.y + maxDim * 0.3,
+        center.z + cameraDistance * 0.8
+      );
+      
+      // 设置相机目标
+      controls.target.set(
+        center.x,
+        center.y,
+        center.z
+      );
+      
+      // 更新控制器
+      controls.update();
+    },
+    
+    // 创建单机架视图 - 组件层面的方法
+    createSingleRackScene(rackData) {
+    if (!this.$refs.baseScene || !this.$refs.baseScene.model) {
+      console.error('缺少基础场景或模型引用');
+      return false;
+    }
+    
+    // 记录当前的相机状态，以便之后返回
+    if (!this.sceneState.originalCameraPosition) {
+      this.sceneState.originalCameraPosition = this.$refs.baseScene.camera.position.clone();
+      this.sceneState.originalControlsTarget = this.$refs.baseScene.controls.target.clone();
+    }
+    
+    // 构建上下文对象，包含所有必要的引用
+    const context = {
+      scene: this.$refs.baseScene.scene,
+      camera: this.$refs.baseScene.camera,
+      renderer: this.$refs.baseScene.renderer,
+      controls: this.$refs.baseScene.controls,
+      mainModel: this.$refs.baseScene.model,
+      getObjectByName: this.getObjectByName.bind(this),
+      setupDeviceInteractivity: this.setupDeviceInteractivity.bind(this),
+      sceneState: this.sceneState,
+      emitViewChanged: (data) => this.$emit('view-changed', data)
+    };
+    
+    // 调用composable中的实现
+    return this._createSingleRackScene(rackData, context);
+  }
   },
   
   mounted() {
     console.log('ServerRoomScene组件挂载完成');
+    
+    // 添加窗口大小变化的监听器
+    window.addEventListener('resize', this.onWindowResize, false);
+    
+    // 延迟初始化，确保基础组件已经完全渲染
+    nextTick(() => {
+      // 初始化悬停相关对象
+      this.hoverState.raycaster = new THREE.Raycaster();
+      
+      // 注册鼠标移动事件监听器，直接在本组件处理
+      if (this.$refs.baseScene && this.$refs.baseScene.$refs.container) {
+        const container = this.$refs.baseScene.$refs.container;
+        //container.addEventListener('mousemove', this.onDirectMouseMove);
+        console.log('已注册直接鼠标移动事件处理器');
+        
+        // 获取容器尺寸
+        this.width = container.clientWidth;
+        this.height = container.clientHeight;
+      } else {
+        console.warn('无法获取容器引用，未能注册直接鼠标移动事件处理器');
+      }
+    });
+    
+    // 初始化直接事件处理
+    this.$nextTick(() => {
+      this.initializeDirectEventHandling();
+    });
   },
   
   beforeUnmount() {
     console.log('ServerRoomScene组件卸载，执行清理...');
     
-    // 清理动画相关状态
+    // 移除事件监听器
+    window.removeEventListener('resize', this.onWindowResize, false);
+    
+    // 取消任何可能正在进行的动画
     if (window.animationFrameId) {
       cancelAnimationFrame(window.animationFrameId);
       window.animationFrameId = null;
     }
     
-    // 清理存储的原始数据
-    if (this.deviceInteractionState) {
-      this.deviceInteractionState.originalColors.clear();
-      this.deviceInteractionState.originalPositions.clear();
+    // 释放Three.js资源
+    if (this.$refs.baseScene) {
+      // 如果有控制器，先清理控制器
+      if (this.$refs.baseScene.controls) {
+        this.$refs.baseScene.controls.dispose();
+      }
+      
+      // 清理场景内的所有资源
+      if (this.$refs.baseScene.scene) {
+        this.disposeScene(this.$refs.baseScene.scene);
+      }
+      
+      // 清理渲染器
+      if (this.$refs.baseScene.renderer) {
+        this.$refs.baseScene.renderer.dispose();
+        this.$refs.baseScene.renderer.forceContextLoss();
+        this.$refs.baseScene.renderer.domElement = null;
+      }
+      
+      // 清理其他THREE.js对象的引用
+      if (this.$refs.baseScene.camera) {
+        this.$refs.baseScene.camera = null;
+      }
+      
+      if (this.$refs.baseScene.raycaster) {
+        this.$refs.baseScene.raycaster = null;
+      }
     }
     
-    // 清理场景状态
-    if (this.sceneState) {
-      this.sceneState.mainScene = null;
-      this.sceneState.singleRackScene = null;
-      this.sceneState.singleDeviceScene = null;
-      this.sceneState.selectedRack = null;
-      this.sceneState.selectedDevice = null;
-      this.sceneState.originalCameraPosition = null;
-      this.sceneState.originalControlsTarget = null;
+    console.log('ServerRoomScene组件资源清理完成');
+    
+    // 移除鼠标移动事件监听器
+    if (this.$refs.baseScene && this.$refs.baseScene.$refs.container) {
+      const container = this.$refs.baseScene.$refs.container;
+      //container.removeEventListener('mousemove', this.onDirectMouseMove);
+      console.log('已移除直接鼠标移动事件处理器');
+    }
+    
+    this.cleanupDirectEventHandling();
+  },
+  
+  // 设置设备交互属性
+  setupDeviceInteractivity(deviceObject) {
+    // 设置设备为可交互
+    if (!deviceObject.userData) deviceObject.userData = {};
+    deviceObject.userData.isInteractive = true;
+    
+    // 如果是网元设备，设置相应类型
+    if (deviceObject.name && deviceObject.name.startsWith('NE_')) {
+      deviceObject.userData.type = 'NE';
+    } else {
+      deviceObject.userData.type = 'device';
     }
   }
 };

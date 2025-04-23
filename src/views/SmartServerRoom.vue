@@ -23,13 +23,12 @@
 
     <!-- 3D视图区域 -->
     <div class="server-room-view" :class="{'full-height': currentSceneView !== 'main'}">
-      <server-room 
+      <server-room-scene 
         :model-path="modelPath" 
         @object-clicked="onObjectClicked"
         @scene-ready="onSceneReady"
-        @object-hover="onObjectHover"
         @view-changed="onViewChanged"
-        ref="serverRoomRef"
+        ref="serverRoomSceneRef"
         :current-view="currentSceneView"
         :background-color="'transparent'"
         :enable-transparent-background="true"
@@ -150,29 +149,7 @@
       </template>
     </base-panel>
     
-    <!-- 设备悬浮提示框 -->
-    <div 
-      class="device-tooltip" 
-      v-if="hoveredDevice && currentSceneView !== 'single-rack'" 
-      :style="{ left: tooltipPosition.x + 'px', top: tooltipPosition.y + 'px' }"
-    >
-      <div class="tooltip-title">{{ hoveredDevice.displayName || formatDeviceName(hoveredDevice.name) }}</div>
-      <div class="tooltip-status" :class="`status-${hoveredDevice.status}`">
-        {{ getStatusLabel(hoveredDevice.status) }}
-          </div>
-      <div class="tooltip-detail">
-        <span class="tooltip-label">温度:</span> 
-        <span :class="getTemperatureClass(hoveredDevice.temperature)">
-          {{ formatTemperature(hoveredDevice.temperature) }}
-        </span>
-        </div>
-      <div class="tooltip-detail">
-        <span class="tooltip-label">CPU:</span> 
-        <span :class="getLoadClass(hoveredDevice.cpuLoad)">
-          {{ formatPercentage(hoveredDevice.cpuLoad) }}
-        </span>
-      </div>
-    </div>
+
     
     <!-- 底部导航栏 -->
     <div class="bottom-nav" v-if="currentSceneView === 'main'">
@@ -195,15 +172,25 @@
 
 <script>
 import { ref, reactive, onBeforeUnmount, onMounted, computed } from 'vue';
-import ServerRoom from '@/components/ServerRoom.vue';
+import ServerRoomScene from '@/components/three/ServerRoomScene.vue';
 import BasePanel from '@/components/ui/BasePanel.vue';
-import { formatTemperature, formatPercentage, formatTime, formatDeviceName } from '@/utils/formatters';
+import { formatTemperature, formatPercentage, formatTime } from '@/utils/formatters';
 import { useWindowResize } from '@/composables/ui/useWindowResize';
+import { 
+  isDevice, 
+  isNetworkElement, 
+  getDeviceTypeLabel,
+  formatDeviceName,
+  DEVICE_TYPES 
+} from '@/utils/deviceUtils';
+
+// 添加formatObjectName作为formatDeviceName的别名
+const formatObjectName = formatDeviceName;
 
 export default {
   name: 'SmartServerRoom',
   components: {
-    ServerRoom,
+    ServerRoomScene,
     BasePanel
   },
   setup() {
@@ -229,16 +216,12 @@ export default {
     const selectedDevice = ref(null);
     const deviceDetailPanelVisible = ref(false);
 
-    // 悬停的设备
-    const hoveredDevice = ref(null);
-    const tooltipPosition = reactive({ x: 0, y: 0 });
-
     // 当前视图模式
     const currentView = ref('overview');
     const alertCount = ref(3);
 
     // 场景相关状态
-    const serverRoomRef = ref(null);
+    const serverRoomSceneRef = ref(null);
     const basePanelRef = ref(null);
     const currentSceneView = ref('main'); // 'main', 'single-rack', 'single-device'
     const selectedRack = ref(null);
@@ -253,45 +236,25 @@ export default {
     // 计算面板位置
     const panelX = computed(() => windowWidth.value - 370);
 
-    // 添加一个辅助函数，用于判断对象是否为设备
-    const isDevice = (object) => {
-      if (!object) return false;
-      
-      // 条件1: 对象类型是device
-      if (object.type === 'device') return true;
-      
-      // 条件2: 名称以NE_开头（网元）
-      if (object.name && object.name.startsWith('NE_')) return true;
-      
-      // 条件3: 名称包含常见设备关键词
-      if (object.name) {
-        const lowerName = object.name.toLowerCase();
-        const deviceKeywords = ['server', 'switch', 'router', 'device', 'net', 'hw_'];
-        return deviceKeywords.some(keyword => lowerName.includes(keyword));
-      }
-      
-      return false;
-    };
-
     // 处理对象点击事件
     const onObjectClicked = (objectData) => {
       console.log('对象被点击:', objectData, '当前视图:', currentSceneView.value);
       
       // 诊断信息：检查是否为网元设备
-      const isNetworkElement = objectData.name && objectData.name.startsWith('NE_');
-      const isDeviceType = objectData.type === 'device';
+      const isNE = isNetworkElement(objectData.name);
+      const isDeviceType = objectData.type === DEVICE_TYPES.NE;
       const isDeviceObject = isDevice(objectData);
       console.log('点击诊断:', {
         对象名称: objectData.name, 
         对象类型: objectData.type,
-        是网元设备: isNetworkElement,
+        是网元设备: isNE,
         是设备类型: isDeviceType,
         满足设备条件: isDeviceObject
       });
       
       if (currentSceneView.value === 'main') {
         // 主视图中的点击处理
-        if (objectData.type === 'rack') {
+        if (objectData.type === DEVICE_TYPES.RACK) {
           // 切换到单机架视图
           switchToSingleRackView(objectData);
           
@@ -307,6 +270,7 @@ export default {
         // 单机架视图中的点击处理
         if (isDeviceObject) {
           console.log('单机架视图中点击设备:', objectData.name);
+          console.log('hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh')
           handleDeviceClick(objectData);
           return;
         } else {
@@ -327,8 +291,14 @@ export default {
         
         selectedDevice.value = {
           name: objectData.name,
-          displayName: formatObjectName(objectData.name),
-          type: objectData.type || (objectData.name && objectData.name.includes('server') ? 'server' : 'device'),
+          displayName: formatDeviceName(objectData.name),
+          type: objectData.type || (
+            isNE ? DEVICE_TYPES.NE : 
+            isDeviceType ? DEVICE_TYPES.NE : 
+            objectData.name && objectData.name.includes('server') ? DEVICE_TYPES.SERVER : 
+            objectData.name && (objectData.name.includes('switch') || objectData.name.includes('router')) ? DEVICE_TYPES.NETWORK : 
+            'device'
+          ),
           status: getRandomStatus(),
           ipAddress: generateRandomIP(),
           temperature: 20 + Math.random() * 15,
@@ -338,7 +308,7 @@ export default {
           lastUpdated: Date.now(),
           uptime: `${randomUptime}天`,
           lastMaintenance: randomLastMaintenance.toLocaleDateString(),
-          location: objectData.name.includes('Rack') ? formatObjectName(objectData.name) : '未知位置',
+          location: objectData.name.includes('Rack') ? formatDeviceName(objectData.name) : '未知位置',
           serialNumber: `SN-${Math.floor(Math.random() * 1000000)}`
         };
         
@@ -352,34 +322,7 @@ export default {
       }
     };
 
-    // 处理对象悬停事件
-    const onObjectHover = (hoverData) => {
-      if (!serverRoomRef.value) {
-            return;
-          }
-          
-      // 更新提示框位置
-      tooltipPosition.x = hoverData.x;
-      tooltipPosition.y = hoverData.y;
 
-      // 获取悬停的对象，这需要在ServerRoom组件中实现相应方法
-      const hoveredObjectData = serverRoomRef.value.getHoveredObject();
-
-      if (hoveredObjectData && hoveredObjectData.name) {
-        // 设置悬停设备信息
-        hoveredDevice.value = {
-          name: hoveredObjectData.name,
-          displayName: formatObjectName(hoveredObjectData.name),
-          type: hoveredObjectData.type,
-          status: getRandomStatus(),
-          temperature: 20 + Math.random() * 15,
-          cpuLoad: Math.random() * 100
-        };
-      } else {
-        // 清除悬停设备信息
-        hoveredDevice.value = null;
-      }
-    };
 
     // 场景就绪事件处理
     const onSceneReady = (data) => {
@@ -432,17 +375,17 @@ export default {
           requestAnimationFrame(fadeOut);
         } else {
           // 创建单机架场景
-          if (serverRoomRef.value) {
-            console.log('开始调用serverRoomRef.createSingleRackScene，参数:', rackData);
-            const result = serverRoomRef.value.createSingleRackScene(rackData);
+          if (serverRoomSceneRef.value) {
+            console.log('开始调用serverRoomSceneRef.createSingleRackScene，参数:', rackData);
+            const result = serverRoomSceneRef.value.createSingleRackScene(rackData);
             
             if (!result) {
               console.error('创建单机架场景失败，检查ServerRoomScene组件的createSingleRackScene方法');
               
               // 尝试直接获取并检查组件内部实例
-              if (serverRoomRef.value.$refs && serverRoomRef.value.$refs.serverRoomScene) {
-                console.log('尝试访问内部ServerRoomScene组件');
-                const innerScene = serverRoomRef.value.$refs.serverRoomScene;
+              if (serverRoomSceneRef.value.$refs && serverRoomSceneRef.value.$refs.baseScene) {
+                console.log('尝试访问内部BaseScene组件');
+                const innerScene = serverRoomSceneRef.value.$refs.baseScene;
                 
                 if (innerScene && typeof innerScene.createSingleRackScene === 'function') {
                   console.log('尝试直接调用内部组件的createSingleRackScene方法');
@@ -456,15 +399,12 @@ export default {
               // 恢复UI状态
               isTransitioning.value = false;
               transitionOpacity.value = 0;
+              
+              console.error('serverRoomSceneRef为空，无法访问3D场景组件');
               return;
-            } else {
-              console.log('创建单机架场景成功');
             }
           } else {
-            console.error('serverRoomRef为空，无法访问3D场景组件');
-            isTransitioning.value = false;
-            transitionOpacity.value = 0;
-            return;
+            console.error('serverRoomSceneRef为空');
           }
           
           // 更新当前视图
@@ -510,19 +450,13 @@ export default {
           requestAnimationFrame(fadeOut);
         } else {
           // 创建单设备场景
-          if (serverRoomRef.value) {
-            const result = serverRoomRef.value.createSingleDeviceScene(deviceData);
+          if (serverRoomSceneRef.value) {
+            const result = serverRoomSceneRef.value.createSingleDeviceScene(deviceData);
             if (!result) {
               console.error('创建单设备场景失败');
-              isTransitioning.value = false;
-              transitionOpacity.value = 0;
-              return;
             }
           } else {
-            console.error('serverRoomRef为空');
-            isTransitioning.value = false;
-            transitionOpacity.value = 0;
-            return;
+            console.error('serverRoomSceneRef为空');
           }
           
           // 更新当前视图
@@ -584,20 +518,14 @@ export default {
           // 重置视图
           isFrontView.value = false;
           
-          // 通知ServerRoom组件切换回主视图
-          if (serverRoomRef.value) {
-            const result = serverRoomRef.value.resetToMainScene();
+          // 通知ServerRoomScene组件切换回主视图
+          if (serverRoomSceneRef.value) {
+            const result = serverRoomSceneRef.value.resetToMainScene();
             if (!result) {
               console.error('重置到主视图失败');
-              isTransitioning.value = false;
-              transitionOpacity.value = 0;
-              return;
             }
           } else {
-            console.error('serverRoomRef为空');
-            isTransitioning.value = false;
-            transitionOpacity.value = 0;
-            return;
+            console.error('serverRoomSceneRef为空');
           }
           
           // 更新当前视图
@@ -643,66 +571,73 @@ export default {
         是有效设备: isValidDevice
       });
       
-      // 获取设备信息
-      const randomUptime = Math.floor(Math.random() * 30) + 1; // 1-30天
-      const randomLastMaintenance = new Date();
-      randomLastMaintenance.setDate(randomLastMaintenance.getDate() - Math.floor(Math.random() * 90)); // 0-90天前
-      
-      // 从设备名称获取更多信息
-      const deviceName = deviceData.name;
-      const isServer = deviceName.includes('server');
-      const isSwitch = deviceName.includes('switch') || deviceName.includes('router');
-      const deviceType = isServer ? 'server' : isSwitch ? 'network' : 'device';
-      
-      // 先执行机架旋转动画
-      if (serverRoomRef.value && typeof serverRoomRef.value.animateRackRotation === 'function') {
+      // 先执行机架旋转动画，使设备正对屏幕
+      if (serverRoomSceneRef.value && typeof serverRoomSceneRef.value.animateRackRotation === 'function') {
         console.log('执行机架旋转动画');
-        serverRoomRef.value.animateRackRotation(Math.PI/2); // 旋转到0度 (正对屏幕)
-      } else if (serverRoomRef.value && serverRoomRef.value.switchToFrontView) {
+        serverRoomSceneRef.value.animateRackRotation(Math.PI/2); // 旋转到0度 (正对屏幕)
+      } else if (serverRoomSceneRef.value && serverRoomSceneRef.value.switchToFrontView) {
         // 如果直接的旋转方法不可用，尝试使用switchToFrontView
         console.log('尝试通过switchToFrontView执行旋转');
-        serverRoomRef.value.switchToFrontView();
+        serverRoomSceneRef.value.switchToFrontView();
       }
       
-      // 构建设备详情数据
-      selectedDevice.value = {
-        name: deviceName,
-        displayName: formatObjectName(deviceName),
-        type: deviceData.type || deviceType,
-        status: getRandomStatus(),
-        ipAddress: generateRandomIP(),
-        temperature: 20 + Math.random() * 15,
-        cpuLoad: Math.random() * 100,
-        memoryUsage: Math.random() * 100,
-        diskUsage: Math.random() * 100,
-        lastUpdated: Date.now(),
-        uptime: `${randomUptime}天`,
-        lastMaintenance: randomLastMaintenance.toLocaleDateString(),
-        location: selectedRack.value ? formatObjectName(selectedRack.value.name) : '未知位置',
-        serialNumber: `SN-${Math.floor(Math.random() * 1000000)}`
-      };
-      
-      // 显示设备详情面板
-      deviceDetailPanelVisible.value = true;
-      console.log('handleDeviceClick: 设置面板显示', deviceDetailPanelVisible.value, selectedDevice.value);
-      
-      // 如果ServerRoom组件支持设备弹出动画，则调用
-      if (serverRoomRef.value && serverRoomRef.value.animateDevice) {
-        console.log('执行设备弹出动画:', deviceName);
-        serverRoomRef.value.animateDevice(deviceName);
+      // 如果ServerRoomScene组件支持设备弹出动画，则调用
+      if (serverRoomSceneRef.value && serverRoomSceneRef.value.animateDevice) {
+        // 这里使用输入的原始名称，增强后的findDeviceByName会处理子部件的情况
+        console.log('执行设备弹出动画:', deviceData.name);
+        const result = serverRoomSceneRef.value.animateDevice(deviceData.name);
+        
+        // 动画执行成功的情况，无论是否点击相同设备
+        if (result) {
+          // 检查是否是已经弹出状态的相同设备 - 这时候复位并关闭详情面板
+          if (serverRoomSceneRef.value.$refs && 
+              serverRoomSceneRef.value.$refs.baseScene && 
+              !serverRoomSceneRef.value.deviceInteractionState.selectedDevice) {
+              deviceDetailPanelVisible.value = false;
+              selectedDevice.value = null;
+              console.log('设备已复位，关闭详情面板');
+              return;
+            }
+          
+          // 准备设备详情数据
+          const randomUptime = Math.floor(Math.random() * 30) + 1; // 1-30天
+          const randomLastMaintenance = new Date();
+          randomLastMaintenance.setDate(randomLastMaintenance.getDate() - Math.floor(Math.random() * 90)); // 0-90天前
+          
+          // 获取更多信息
+          const deviceName = deviceData.name;
+          const isNE = isNetworkElement(deviceName);
+          const isServer = deviceName.includes('server');
+          const isSwitch = deviceName.includes('switch') || deviceName.includes('router');
+          
+          // 更新设备详情数据
+          selectedDevice.value = {
+            name: deviceName,
+            displayName: formatDeviceName(deviceName),
+            type: deviceData.type || (
+              isNE ? DEVICE_TYPES.NE : 
+              isServer ? DEVICE_TYPES.SERVER : 
+              isSwitch ? DEVICE_TYPES.NETWORK : 
+              'device'
+            ),
+            status: getRandomStatus(),
+            ipAddress: generateRandomIP(),
+            temperature: 20 + Math.random() * 15,
+            cpuLoad: Math.random() * 100,
+            memoryUsage: Math.random() * 100,
+            diskUsage: Math.random() * 100,
+            lastUpdated: Date.now(),
+            uptime: `${randomUptime}天`,
+            lastMaintenance: randomLastMaintenance.toLocaleDateString(),
+            location: selectedRack.value ? formatDeviceName(selectedRack.value.name) : '未知位置',
+            serialNumber: `SN-${Math.floor(Math.random() * 1000000)}`
+          };
+          
+          // 显示设备详情面板，强制设置为true
+          deviceDetailPanelVisible.value = true;
+          console.log('handleDeviceClick: 设置面板显示', deviceDetailPanelVisible.value, selectedDevice.value);
+        }
       }
-    };
-
-    // 辅助函数
-    const getDeviceTypeLabel = (type) => {
-      const typeMap = {
-        'device': '服务器',
-        'rack': '机架',
-        'switch': '交换机',
-        'router': '路由器',
-        'unknown': '未知设备'
-      };
-      return typeMap[type] || typeMap.unknown;
     };
 
     const getStatusLabel = (status) => {
@@ -762,46 +697,6 @@ export default {
       }
     }, 10000);
 
-    // 格式化对象名称
-    const formatObjectName = (objName) => {
-      // 检查是否为设备对象 (带NE_前缀)
-      if (objName && objName.startsWith('NE_')) {
-        const parts = objName.split('_');
-        // 设备对象的格式是 NE_Rack-XX_room_label_type_position
-        if (parts.length >= 6) {  // 完整格式有6个部分
-          // 只保留设备标签和类型，忽略机架信息和位置
-          return `${parts[3]}_${parts[4]}`;
-        }
-        return objName; // 如果格式不符合预期，返回原名
-      }
-      
-      // 检查是否为机架对象
-      if (objName && objName.includes('Rack-')) {
-        const parts = objName.split('_');
-        if (parts.length >= 2) {
-          // 提取机架编号，去掉"Rack-"前缀
-          const rackNumber = parseInt(parts[0].replace('Rack-', ''), 10);
-          
-          // 根据机房代码确定机房名称
-          let roomName = '';
-          if (parts[1] === 'east') {
-            roomName = '新机房-东';
-          } else if (parts[1] === 'west') {
-            roomName = '新机房-西';
-          } else if (parts[1] === 'middle') {
-            roomName = '老机房';
-          } else {
-            roomName = parts[1]; // 未知代码时使用原值
-          }
-          
-          return `${roomName}-- 机架${rackNumber}`;
-        }
-      }
-      
-      // 默认返回原始名称
-      return objName;
-    };
-
     // 处理视图变化事件
     const onViewChanged = (data) => {
       console.log('视图变化:', data);
@@ -840,14 +735,11 @@ export default {
       modelPath,
       selectedDevice,
       deviceDetailPanelVisible,
-      hoveredDevice,
-      tooltipPosition,
       currentView,
       alertCount,
       windowWidth,
       windowHeight,
       onObjectClicked,
-      onObjectHover,
       onSceneReady,
       closeDeviceDetails,
       restartDevice,
@@ -862,7 +754,7 @@ export default {
       formatTime,
       formatDeviceName,
       // 场景切换相关
-      serverRoomRef,
+      serverRoomSceneRef,
       currentSceneView,
       isTransitioning,
       transitionOpacity,

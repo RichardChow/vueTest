@@ -337,7 +337,7 @@ export default {
         // 检查是否是网元设备（服务器、交换机等）
         else if (mesh.name.startsWith('NE_')) {
           mesh.userData.isInteractive = true;
-          mesh.userData.type = 'device';
+          mesh.userData.type = 'NE';
           console.log(`标记为可交互设备: ${mesh.name}`);
         }
         // 检查是否是环境对象
@@ -383,16 +383,43 @@ export default {
       if (intersects.length > 0) {
         // 获取第一个相交的对象
         let selectedObject = intersects[0].object;
+        let foundInteractiveObject = null;
+        let foundParentNetworkElement = null;
         
-        // 向上遍历对象层级，找到第一个有名称和交互属性的对象
-        while (selectedObject && (!selectedObject.name || !selectedObject.userData.isInteractive) && selectedObject.parent) {
+        console.log('基础场景: 点击原始相交对象:', selectedObject.name);
+        
+        // 向上遍历对象层级
+        while (selectedObject) {
+          // 如果对象有交互属性
+          if (selectedObject.name && selectedObject.userData && selectedObject.userData.isInteractive) {
+            if (!foundInteractiveObject) {
+              foundInteractiveObject = selectedObject;
+              console.log(`基础场景: 点击找到可交互对象 ${foundInteractiveObject.name}`);
+            }
+            
+            // 如果当前对象是网元设备，优先使用它
+            if (selectedObject.name.startsWith('NE_')) {
+              foundParentNetworkElement = selectedObject;
+              console.log(`基础场景: 点击找到父级网元设备 ${foundParentNetworkElement.name}`);
+              break; // 找到网元设备后停止遍历
+            }
+          }
+          
+          // 继续向上遍历，除非已到达顶层
+          if (!selectedObject.parent) {
+            console.log('基础场景: 点击到达顶层，未找到网元设备父级');
+            break;
+          }
           selectedObject = selectedObject.parent;
         }
         
-        // 如果对象有名称且被标记为可交互
-        if (selectedObject && selectedObject.name && selectedObject.userData.isInteractive) {
-          // 执行点击处理，可以被子类重写
-          this.handleObjectClick(selectedObject, intersects[0].point);
+        // 优先使用网元设备，否则使用找到的第一个可交互对象
+        const finalObject = foundParentNetworkElement || foundInteractiveObject;
+        
+        // 如果找到了最终对象
+        if (finalObject) {
+          // 执行点击处理
+          this.handleObjectClick(finalObject, intersects[0].point);
         }
       }
     },
@@ -431,39 +458,56 @@ export default {
       }
       
       let foundInteractiveObject = null;
+      let foundParentNetworkElement = null;
+      
       if (intersects.length > 0) {
         let currentObject = intersects[0].object;
-        console.log('基础场景: 原始相交对象:', currentObject.name, currentObject);
+        // console.log('基础场景: 原始相交对象:', currentObject.name, currentObject);
         
         // 向上遍历查找第一个标记为可交互的对象
         while (currentObject) {
-          console.log(`基础场景: 检查对象: ${currentObject.name}, isInteractive: ${currentObject.userData?.isInteractive}`);
+          // console.log(`基础场景: 检查对象: ${currentObject.name}, isInteractive: ${currentObject.userData?.isInteractive}`);
+          
+          // 标记可交互的对象
           if (currentObject.userData && currentObject.userData.isInteractive) {
-            foundInteractiveObject = currentObject;
-            console.log(`基础场景: 找到可交互对象 ${foundInteractiveObject.name}`);
-            break; // 找到后即停止遍历
+            if (!foundInteractiveObject) {
+              foundInteractiveObject = currentObject;
+              // console.log(`基础场景: 找到可交互对象 ${foundInteractiveObject.name}`);
+            }
+            
+            // 如果当前对象是网元设备（名称以NE_开头），优先使用它
+            if (currentObject.name && currentObject.name.startsWith('NE_')) {
+              foundParentNetworkElement = currentObject;
+              // console.log(`基础场景: 找到父级网元设备 ${foundParentNetworkElement.name}`);
+              break; // 找到网元设备后停止遍历
+            }
           }
+          
+          // 继续向上遍历
           if (!currentObject.parent) {
-            console.log('基础场景: 到达顶层，未找到可交互父级');
+            // console.log('基础场景: 到达顶层，未找到网元设备父级');
             break;
           }
           currentObject = currentObject.parent;
         }
       }
 
-      // 如果找到了可交互对象
-      if (foundInteractiveObject) {
-        console.log(`基础场景: 设置悬停对象 ${foundInteractiveObject.name}, userData:`, foundInteractiveObject.userData);
-        this.highlightObject(foundInteractiveObject); // 高亮
-        this.currentHoveredObject = markRaw(foundInteractiveObject); // 设置当前悬停对象
+      // 优先使用网元设备，如果没有则使用找到的第一个可交互对象
+      const finalObject = foundParentNetworkElement || foundInteractiveObject;
+
+      // 如果找到了最终对象
+      if (finalObject) {
+        // console.log(`基础场景: 设置悬停对象 ${finalObject.name}, userData:`, finalObject.userData);
+        this.highlightObject(finalObject); // 高亮
+        this.currentHoveredObject = markRaw(finalObject); // 设置当前悬停对象
         
         // 发送鼠标悬停位置事件，包含对象信息
         this.$emit('object-hover', {
           x: event.clientX,
           y: event.clientY,
           objectFound: true,
-          objectName: foundInteractiveObject.name,
-          objectType: foundInteractiveObject.userData.type || 'unknown'
+          objectName: finalObject.name,
+          objectType: finalObject.userData.type || 'unknown'
         });
       } else {
         // 未找到可交互对象，只发送鼠标位置
@@ -474,6 +518,13 @@ export default {
         });
         console.log('基础场景: 无相交对象或未找到可交互对象');
       }
+
+      // console.log('射线位置:', this.raycaster.ray.origin, '方向:', this.raycaster.ray.direction);
+      // console.log('相交结果详情:', intersects.map(i => ({
+      //   对象名称: i.object.name,
+      //   距离: i.distance,
+      //   点: i.point
+      // })));
     },
     
     // eslint-disable-next-line no-unused-vars

@@ -54,13 +54,8 @@
 </template>
 
 <script>
-import ServerRoom from '@/components/ServerRoom.vue'
-
 export default {
   name: 'AppDashboard',
-  components: {
-    ServerRoom
-  },
   data() {
     return {
       currentLanguage: '中文'
