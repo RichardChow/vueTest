@@ -325,7 +325,7 @@ export function useSceneInteractions(options = {}) {
   };
   
   // 鼠标抬起事件处理
-  const handleMouseUp = (event) => {
+  const handleMouseUp = () => {
     // 拖拽结束处理逻辑
     if (state.isDragging) {
       state.isDragging = false;

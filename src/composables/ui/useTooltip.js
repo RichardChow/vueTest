@@ -1,6 +1,6 @@
 // src/composables/ui/useTooltip.js
 
-import { reactive, ref, computed, watch } from 'vue';
+import { reactive, computed } from 'vue';
 
 /**
  * 提供通用的工具提示功能

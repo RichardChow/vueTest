@@ -2,13 +2,30 @@
 import * as THREE from 'three';
 import { reactive } from 'vue';
 
+const easeInOutCubic = (t) => {
+  return t < 0.5
+    ? 4 * t * t * t
+    : 1 - Math.pow(-2 * t + 2, 3) / 2;
+};
+
+const easeOutCubic = (t) => {
+  return 1 - Math.pow(1 - t, 3);
+};
+
+
 export function useRackView() {
   // 维护机架视图状态
   const rackViewState = reactive({
     selectedRack: null,
     isActive: false,
     sceneContainer: null,
-    sceneOrigin: null
+    sceneOrigin: null,
+    isFrontView: false,
+    currentRack: null,
+    activeDevice: null,
+    activeDeviceParts: [],
+    deviceInteractionState: 0,
+    firstNetworkElementClick: true
   });
 
   /**
@@ -280,6 +297,9 @@ export function useRackView() {
         });
       }
       
+      // 重置第一次点击标记
+      rackViewState.firstNetworkElementClick = true;
+      
       console.log('单机架视图创建完成');
       return true;
     } catch (error) {
@@ -293,7 +313,7 @@ export function useRackView() {
  * @param {Object} context - 场景上下文
  * @returns {Boolean} 是否成功销毁
  */
-function destroySingleRackScene(context) {
+  function destroySingleRackScene(context) {
     const { scene, sceneState, mainModel, emitViewChanged, renderer, camera } = context;
     
     if (!rackViewState.isActive) return false;
@@ -400,6 +420,9 @@ function destroySingleRackScene(context) {
         });
       }
       
+      // 重置第一次点击标记
+      rackViewState.firstNetworkElementClick = true;
+      
       console.log('单机架视图清理完成');
       return true;
     } catch (error) {
@@ -408,9 +431,484 @@ function destroySingleRackScene(context) {
     }
   }
 
+  
+  function animateRackRotation(targetRotation, context) {
+    const {renderer, camera, sceneState, scene} = context;
+    const origin = rackViewState.sceneOrigin || sceneState.singleRackOrigin;
+    if (!origin) {
+      console.error('单机架场景原点不存在，无法执行旋转动画');
+      return;
+    }
+    
+    const startRotation = origin.rotation.y;
+    const duration = 1000; // 旋转动画持续时间，单位毫秒
+    const startTime = Date.now();
+    
+    // 定义动画函数
+    const animate = () => {
+      const now = Date.now();
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1); // 0到1之间的进度值
+      
+      // 使用缓动函数使动画更加平滑
+      const easedProgress = easeInOutCubic(progress);
+      
+      // 计算当前旋转角度
+      const currentRotation = startRotation + (targetRotation - startRotation) * easedProgress;
+      
+      // 应用旋转
+      origin.rotation.y = currentRotation;
+      
+      // 强制渲染
+      if (renderer && camera && scene) {
+        renderer.render(scene, camera);
+      }
+      
+      // 如果动画未完成，继续
+      if (progress < 1) {
+        window.requestAnimationFrame(animate);
+      } else {
+        console.log('机架旋转动画完成');
+      }
+    };
+    
+    // 启动动画
+    window.requestAnimationFrame(animate);
+  }
+  
+  function switchToFrontView(context) {
+    const {sceneState} = context; 
+    console.log('切换到正面视图');
+    
+    const origin = rackViewState.sceneOrigin || sceneState.singleRackOrigin;
+    if (!origin) {
+      console.error('单机架场景原点不存在，无法旋转');
+      return false;
+    }
+    
+    if (rackViewState.isFrontView) {
+      console.log('已经是正面视图，不需要切换');
+      return false;
+    }
+    
+    // 将机架旋转到正面（0度）
+    animateRackRotation(Math.PI/2, context);
+    rackViewState.isFrontView = true;
+    if (sceneState) {
+      sceneState.isFrontView = true;
+    }
+    
+    return true;
+  }
+
+  // 单机架视图中的点击处理
+  function handleSingleRackViewClick(data, context) {
+    const {sceneState} = context;
+    // 检查是否为网元设备
+    const isNetworkElement = data.name && data.name.startsWith('NE_');
+    
+    // 如果是网元设备
+    if (isNetworkElement) {
+      console.log('单机架视图中点击网元设备:', data.name);
+      
+      // 如果当前是侧面视图，则先切换到正面视图
+      if (!rackViewState.isFrontView && !sceneState?.isFrontView) {
+        console.log('单机架视图中点击，切换到正面视图');
+        switchToFrontView(context);
+      }
+      
+      // 检查是否是第一次点击网元
+      if (rackViewState.firstNetworkElementClick) {
+        console.log('第一次点击网元，仅切换视图，不执行弹出动画');
+        rackViewState.firstNetworkElementClick = false; // 更新状态
+        return; // 直接返回，不执行弹出动画
+      } else {
+        // 非第一次点击，执行弹出动画
+        console.log('非第一次点击网元，执行弹出动画');
+        animateRackDevice(data.name, context);
+      }
+    } else if (data.type === 'rack') {
+      // 点击机架对象
+      console.log('单机架视图中点击机架:', data.name);
+      // 如果当前是侧面视图，则切换到正面视图
+      if (!rackViewState.isFrontView && !sceneState?.isFrontView) {
+        switchToFrontView(context);
+      }
+    } else {
+      // 如果点击的是其他非设备对象，不做特殊处理
+      console.log('单机架视图中点击非设备对象:', data.name);
+      // 如果当前是侧面视图，则切换到正面视图
+      if (!rackViewState.isFrontView && !sceneState?.isFrontView) {
+        console.log('单机架视图中点击，切换到正面视图');
+        switchToFrontView(context);
+      }
+    }
+  }
+
+  // 设备动画方法 - 对外暴露的接口
+  function animateRackDevice(deviceName, context) {
+    const {scene, deviceInteractionState} = context;
+    console.log('执行设备弹出动画:', deviceName);
+    
+    // 查找设备对象
+    const deviceObj = findDeviceByName(deviceName, context);
+    if (!deviceObj) {
+      console.error('设备对象未找到:', deviceName);
+      return false;
+    }
+    
+    // 获取设备ID
+    const deviceId = deviceObj.userData.originalDevice || deviceObj.name;
+    
+    // 查找同一设备ID下的所有部件
+    let deviceParts = [];
+    
+    // 收集同一设备的所有部件
+    scene.traverse((obj) => {
+      if (obj.isMesh && (
+        obj === deviceObj || 
+        (obj.userData && obj.userData.originalDevice === deviceId) ||
+        (deviceObj.name.startsWith('NE_') && obj.name.includes(deviceObj.name.split('_')[2]))
+      )) {
+        deviceParts.push(obj);
+      }
+    });
+    
+    // 如果没有找到其他部件，就使用当前对象
+    if (deviceParts.length === 0) {
+      deviceParts = [deviceObj];
+    }
+    
+    console.log(`找到设备 ${deviceId} 的 ${deviceParts.length} 个部件`);
+    
+    // 获取当前状态
+    const currentlySelectedDeviceObj = rackViewState.activeDevice || deviceInteractionState?.selectedDevice;
+    const currentlySelectedParts = rackViewState.activeDeviceParts || deviceInteractionState?.deviceParts;
+    const currentStage = rackViewState.deviceInteractionState || deviceInteractionState?.interactionStage;
+    const isClickingSameDevice = currentlySelectedDeviceObj && 
+                                (currentlySelectedDeviceObj === deviceObj || 
+                                  currentlySelectedDeviceObj.name === deviceObj.name);
+    
+    console.log('当前交互状态:', {
+      当前选中设备: currentlySelectedDeviceObj ? currentlySelectedDeviceObj.name : 'null',
+      当前交互阶段: currentStage,
+      是否点击同一设备: isClickingSameDevice
+    });
+    
+    if (isClickingSameDevice && currentStage === 1) {
+      // 点击同一设备且处于弹出状态：复位并清除状态
+      console.log('点击同一设备，执行复位');
+      resetRackDeviceAnimation(currentlySelectedDeviceObj, currentlySelectedParts, context);
+      
+      // 清除全局状态
+      rackViewState.activeDevice = null;
+      rackViewState.activeDeviceParts = [];
+      rackViewState.deviceInteractionState = 0;
+
+      // 同时更新组件状态
+      if (deviceInteractionState) {
+        deviceInteractionState.selectedDevice = null;
+        deviceInteractionState.deviceParts = [];
+        deviceInteractionState.interactionStage = 0;
+      }
+      
+      return true;
+      } else {
+      // 点击新设备或首次点击任何设备
+      
+      // 1. 复位之前的设备动画（如果有）
+      if (currentlySelectedDeviceObj && !isClickingSameDevice) {
+        console.log('先复位之前的设备:', currentlySelectedDeviceObj.name);
+        resetRackDeviceAnimation(currentlySelectedDeviceObj, currentlySelectedParts, context);
+      }
+      
+      // 2. 立即更新新设备的全局状态
+      rackViewState.activeDevice = deviceObj;
+      rackViewState.activeDeviceParts = deviceParts;
+      rackViewState.deviceInteractionState = 1;
+
+      // 同时更新组件状态
+      if (deviceInteractionState) {
+        deviceInteractionState.selectedDevice = deviceObj;
+        deviceInteractionState.deviceParts = deviceParts;
+        deviceInteractionState.interactionStage = 1;
+      }
+
+      // 3. 存储新设备的原始变换（在动画之前）
+      deviceParts.forEach(part => {
+        if (!part.userData.originalPosition) {
+          part.userData.originalPosition = part.position.clone();
+        }
+      });
+      
+      // 4. 执行新设备的弹出动画
+      console.log('执行新设备的弹出动画');
+      animateRackDeviceStage1(deviceObj, deviceParts, context);
+      
+      return true;
+    }
+  }
+
+  // 设备弹出动画第一阶段 - 向前弹出
+  function animateRackDeviceStage1(deviceObj, partsToAnimate, context) {
+    const {renderer, camera, scene} = context;
+    // 使用传入的部件或回退
+    const deviceParts = partsToAnimate || [deviceObj];
+    if (!deviceParts || deviceParts.length === 0) {
+      console.error("animateRackDeviceStage1: 没有可以动画的部件");
+      return;
+    }
+    
+    console.log(`开始执行设备弹出动画，有 ${deviceParts.length} 个部件需要处理`);
+    
+    // 确定设备的弹出方向 - 向前弹出 (Z轴正方向，即从屏幕向用户方向)
+    const isNetworkElement = deviceObj.name && deviceObj.name.startsWith('NE_');
+    const moveDistance = isNetworkElement ? 0.30 : 0.1; // 调整为更短的弹出距离
+    const duration = 500;     // 动画持续时间(毫秒)
+    const startTime = Date.now();
+    
+    
+    // 存储动画开始时的位置
+    const startPositions = deviceParts.map(part => part.position.clone());
+    
+    // 存储每个部件的原始位置
+    deviceParts.forEach(part => {
+      if (!part.userData.originalPosition) {
+        part.userData.originalPosition = part.position.clone();
+      }
+    });
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeProgress = easeOutCubic(progress);
+      
+      deviceParts.forEach((part, index) => {
+        const originalPosition = part.userData.originalPosition; // 设备在机架内的原始位置
+        const startPosition = startPositions[index]; // 动画开始时的位置
+        
+        if (!originalPosition || !startPosition) {
+          console.warn("缺少部件的原始位置或起始位置:", part.name);
+          return;
+        }
+        
+        // 向前弹出 - 使用Z轴正方向 (从屏幕向用户方向)
+        const targetZ = originalPosition.z + moveDistance; // 目标Z轴位置
+        
+        // 使用lerp平滑插值Z轴
+        part.position.z = startPosition.z + (targetZ - startPosition.z) * easeProgress;
+        
+        // 确保X和Y轴保持在原始位置
+        part.position.x = originalPosition.x;
+        part.position.y = originalPosition.y;
+      });
+      
+      // 强制渲染
+      if (renderer && camera && scene) {
+        renderer.render(
+          scene,
+          camera
+        );
+      }
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    
+    animate();
+  }
+
+  // 添加 resetRackDeviceAnimation 函数
+  function resetRackDeviceAnimation(deviceObj, deviceParts, context) {
+    const { renderer, camera, scene } = context;
+    console.log('重置设备动画:', deviceObj ? deviceObj.name : '无');
+    
+    if (!deviceParts || deviceParts.length === 0) {
+      return;
+    }
+    
+    const duration = 400;     // 复位动画持续时间(毫秒)
+    const startTime = Date.now();
+    
+    // 存储动画开始时的位置
+    const startPositions = deviceParts.map(part => part.position.clone());
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // 使用模块级别的 easeInOutCubic，而不是 this.easeInOutCubic
+      const easeProgress = easeInOutCubic(progress);
+      
+      deviceParts.forEach((part, index) => {
+        const originalPosition = part.userData.originalPosition; // 原始位置
+        const startPosition = startPositions[index]; // 动画开始时的位置
+        
+        if (!originalPosition || !startPosition) {
+          return;
+        }
+        
+        // 计算当前位置 - 平滑过渡回原始位置
+        const currentX = startPosition.x + (originalPosition.x - startPosition.x) * easeProgress;
+        const currentY = startPosition.y + (originalPosition.y - startPosition.y) * easeProgress;
+        const currentZ = startPosition.z + (originalPosition.z - startPosition.z) * easeProgress;
+        
+        // 应用位置
+        part.position.set(currentX, currentY, currentZ);
+        
+        // 恢复原始颜色
+        if (part.material && part.userData._originalColor) {
+          if (Array.isArray(part.material)) {
+            part.material.forEach(mat => {
+              if (mat.color) {
+                mat.color.copy(part.userData._originalColor);
+                if (mat.emissive) {
+                  mat.emissive.setRGB(0, 0, 0);
+                }
+              }
+            });
+          } else if (part.material.color) {
+            part.material.color.copy(part.userData._originalColor);
+            if (part.material.emissive) {
+              part.material.emissive.setRGB(0, 0, 0);
+            }
+          }
+        }
+      });
+      
+      // 强制渲染 - 使用传入的 renderer 和 camera
+      if (renderer && camera && scene) {
+        renderer.render(scene, camera);
+      }
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        console.log('设备动画复位完成');
+      }
+    };
+    
+    animate();
+  }
+
+
+  // 查找设备对象 - 增强版，支持通过子部件找到父级网元设备
+  function findDeviceByName(deviceName, context ) {
+    const {scene} = context;
+    if (!scene) {
+      console.error('场景未初始化，无法查找设备');
+      return null;
+    }
+    
+    let foundDevice = null;
+    
+    // 尝试直接查找完整匹配
+    scene.traverse(object => {
+      if (object.name === deviceName) {
+        foundDevice = object;
+      }
+    });
+    
+    // 如果找到了，直接返回
+    if (foundDevice) {
+      console.log('直接找到设备:', foundDevice.name);
+      return foundDevice;
+    }
+    
+    // 如果未找到，可能是子部件名称，尝试查找父级网元设备
+    // 先尝试查找精确匹配的子部件
+    let foundChild = null;
+    scene.traverse(object => {
+      if (object.name === deviceName) {
+        foundChild = object;
+      }
+    });
+    
+    // 如果找到了子部件，向上查找其父级网元设备
+    if (foundChild) {
+      console.log('找到子部件:', foundChild.name, '开始查找父级网元设备');
+      
+      // 向上遍历查找父级，直到找到网元设备或达到根节点
+      let currentParent = foundChild.parent;
+      while (currentParent) {
+        // 检查是否为网元设备
+        if (currentParent.name && currentParent.name.startsWith('NE_')) {
+          console.log('找到父级网元设备:', currentParent.name);
+          return currentParent;
+        }
+        // 继续向上查找
+        currentParent = currentParent.parent;
+      }
+      
+      // 如果没有找到父级网元，返回子部件本身
+      console.log('未找到父级网元设备，返回子部件:', foundChild.name);
+      return foundChild;
+    }
+    
+    // 如果上述方法都没找到，尝试寻找匹配的网元设备（部分匹配）
+    if (deviceName.includes('Cube') || deviceName.includes('cube')) {
+      console.log('尝试根据Cube部件名称查找相关网元设备');
+      let networkElements = [];
+      
+      // 收集所有网元设备
+      scene.traverse(object => {
+        if (object.name && object.name.startsWith('NE_')) {
+          networkElements.push(object);
+        }
+      });
+      
+      // 尝试查找包含此Cube的网元设备
+      for (const ne of networkElements) {
+        let hasMatchingChild = false;
+        ne.traverse(child => {
+          if (child.name === deviceName) {
+            hasMatchingChild = true;
+          }
+        });
+        
+        if (hasMatchingChild) {
+          console.log('通过子部件查找到网元设备:', ne.name);
+          return ne;
+        }
+      }
+    }
+    
+    // 如果是点击了网元名称的部分匹配 (例如NE_Rack-01_east)
+    if (deviceName.startsWith('NE_')) {
+      const devicePrefix = deviceName.split('_').slice(0, 3).join('_'); // 例如 NE_Rack-01_east
+      
+      // 尝试查找以此前缀开头的网元设备
+      let bestMatch = null;
+      
+      scene.traverse(object => {
+        if (object.name && object.name.startsWith(devicePrefix)) {
+          // 如果还没有匹配或者当前对象的名称更长(更精确)
+          if (!bestMatch || object.name.length > bestMatch.name.length) {
+            bestMatch = object;
+          }
+        }
+      });
+      
+      if (bestMatch) {
+        console.log('通过前缀匹配找到网元设备:', bestMatch.name);
+        return bestMatch;
+      }
+    }
+    
+    console.warn('无法找到设备:', deviceName);
+    return null;
+  }
+  
+
   return {
     rackViewState,
     createSingleRackScene,
-    destroySingleRackScene
+    destroySingleRackScene,
+    animateRackRotation,
+    switchToFrontView,
+    handleSingleRackViewClick,
+    animateRackDevice,
+    resetRackDeviceAnimation,
+    findDeviceByName
   };
 }

@@ -30,8 +30,7 @@ export function useDeviceView() {
       renderer, 
       controls,
       mainModel,
-      getObjectByName, 
-      setupDeviceInteractivity,
+      getObjectByName,
       sceneState,
       emitViewChanged
     } = context;
@@ -308,62 +307,9 @@ export function useDeviceView() {
     }
   }
 
-  /**
-   * 动画展示设备
-   * @param {Object} deviceObject - 设备对象
-   * @param {Object} context - 场景上下文
-   * @returns {Boolean} 是否成功开始动画
-   */
-  function animateDevice(deviceObject, context) {
-    if (!deviceViewState.isActive || !deviceViewState.deviceParts.length) {
-      console.error('无法执行设备动画：设备视图未激活或无部件');
-      return false;
-    }
-    
-    const { animationState } = deviceViewState;
-    const { renderer, camera, scene } = context;
-    
-    // 如果已经在动画中，则忽略请求
-    if (animationState.isAnimating) return false;
-    
-    animationState.isAnimating = true;
-    
-    // 根据当前阶段执行不同动画
-    switch (animationState.stage) {
-      case 0: // 初始状态：执行弹出动画
-        console.log('执行设备弹出动画');
-        // 这里可以实现弹出动画逻辑
-        animationState.stage = 1;
-        break;
-        
-      case 1: // 弹出状态：执行展开动画
-        console.log('执行设备展开动画');
-        // 这里可以实现展开动画逻辑
-        animationState.stage = 2;
-        break;
-        
-      case 2: // 展开状态：返回初始状态
-        console.log('重置设备到初始状态');
-        // 这里可以实现重置动画逻辑
-        animationState.stage = 0;
-        break;
-    }
-    
-    // 更新场景渲染
-    if (renderer && camera && scene) {
-      renderer.render(scene, camera);
-    }
-    
-    // 动画完成
-    animationState.isAnimating = false;
-    
-    return true;
-  }
-
   return {
     deviceViewState,
     createSingleDeviceScene,
-    destroySingleDeviceScene,
-    animateDevice
+    destroySingleDeviceScene
   };
 }
