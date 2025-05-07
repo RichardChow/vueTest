@@ -6,12 +6,10 @@
 // 设备类型常量定义
 export const DEVICE_TYPES = {
   NE: 'NE',                   // 网元设备
-  SERVER: 'Server',           // 服务器
-  NETWORK: 'Network',         // 网络设备
+  LINUX: 'Linux',           // linux服务器
+  WINDOWS: 'Windows',         // windows PC
   SWITCH: 'Switch',           // 交换机
-  ROUTER: 'Router',           // 路由器
   POWER: 'Power',             // 电源设备
-  COMPUTER: 'Computer',       // 计算机
   DATA_TESTER: 'DataNetworkTester', // 数据仪表设备
   RACK: 'Rack',               // 机架（严格来说不是设备）
   UNKNOWN: 'Unknown'          // 未知设备
@@ -20,14 +18,12 @@ export const DEVICE_TYPES = {
 // 设备类型中文映射
 export const DEVICE_TYPE_LABELS = {
   [DEVICE_TYPES.NE]: '网元设备',
-  [DEVICE_TYPES.SERVER]: '服务器',
-  [DEVICE_TYPES.NETWORK]: '网络设备',
+  [DEVICE_TYPES.LINUX]: 'Linux服务器',
+  [DEVICE_TYPES.WINDOWS]: 'Windows PC',
+  [DEVICE_TYPES.SWITCH]: '交换机',
   [DEVICE_TYPES.POWER]: '电源设备',
   [DEVICE_TYPES.DATA_TESTER]: '数据仪表设备',
   [DEVICE_TYPES.RACK]: '机架',
-  [DEVICE_TYPES.SWITCH]: '交换机',
-  [DEVICE_TYPES.ROUTER]: '路由器',
-  [DEVICE_TYPES.COMPUTER]: '计算机',
   [DEVICE_TYPES.UNKNOWN]: '未知设备'
 };
 
@@ -65,21 +61,13 @@ export const detectDevice = (object) => {
   }
   
   // 服务器检测
-  if (lowerName.includes('server') || lowerName.includes('host')) {
-    return DEVICE_TYPES.SERVER;
+  if (lowerName.includes('linux')) {
+    return DEVICE_TYPES.LINUX;
   }
   
   // 网络设备检测
   if (lowerName.includes('switch')) {
     return DEVICE_TYPES.SWITCH;
-  }
-  
-  if (lowerName.includes('router')) {
-    return DEVICE_TYPES.ROUTER;
-  }
-  
-  if (lowerName.includes('network')) {
-    return DEVICE_TYPES.NETWORK;
   }
   
   // 电源设备检测
@@ -93,11 +81,10 @@ export const detectDevice = (object) => {
   }
   
   // 计算机检测
-  if (lowerName.includes('computer') || lowerName.includes('pc')) {
-    return DEVICE_TYPES.COMPUTER;
+  if (lowerName.includes('windows')) {
+    return DEVICE_TYPES.WINDOWS;
   }
   
-  // 机架检测(注意：严格来说机架不是设备，但可能需要区分)
   if (lowerName.includes('rack')) {
     return DEVICE_TYPES.RACK;
   }

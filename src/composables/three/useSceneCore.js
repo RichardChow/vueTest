@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ref, onBeforeUnmount } from 'vue';
+import { ref, onBeforeUnmount, shallowRef, markRaw } from 'vue';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 /**
@@ -7,12 +7,12 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
  * 提供场景初始化、资源管理、渲染循环等核心功能
  */
 export function useSceneCore() {
-  // 核心场景引用
-  const scene = ref(null);
-  const camera = ref(null);
-  const renderer = ref(null);
-  const controls = ref(null);
-  const container = ref(null);
+  // 使用shallowRef而不是ref来引用Three.js对象
+  const scene = shallowRef(null);
+  const camera = shallowRef(null);
+  const renderer = shallowRef(null);
+  const controls = shallowRef(null);
+  const container = shallowRef(null);
   
   // 状态管理
   const isInitialized = ref(false);
@@ -51,8 +51,8 @@ export function useSceneCore() {
 
     container.value = domContainer;
 
-    // 创建场景
-    scene.value = new THREE.Scene();
+    // 使用markRaw标记所有Three.js对象
+    scene.value = markRaw(new THREE.Scene());
     
     // 根据透明度设置场景背景
     if (!alpha) {
@@ -61,25 +61,25 @@ export function useSceneCore() {
       scene.value.background = null;
     }
 
-    // 创建相机
-    camera.value = new THREE.PerspectiveCamera(
+    // 同样使用markRaw标记相机
+    camera.value = markRaw(new THREE.PerspectiveCamera(
       cameraFov,
-      container.value.clientWidth / container.value.clientHeight,
+      domContainer.clientWidth / domContainer.clientHeight,
       near,
       far
-    );
+    ));
     camera.value.position.set(
       cameraPosition.x,
       cameraPosition.y,
       cameraPosition.z
     );
 
-    // 创建渲染器
-    renderer.value = new THREE.WebGLRenderer({
+    // 确保所有Three.js对象都用markRaw处理
+    renderer.value = markRaw(new THREE.WebGLRenderer({
       antialias: true,
       alpha: alpha
-    });
-    renderer.value.setSize(container.value.clientWidth, container.value.clientHeight);
+    }));
+    renderer.value.setSize(domContainer.clientWidth, domContainer.clientHeight);
     renderer.value.setPixelRatio(window.devicePixelRatio);
     renderer.value.shadowMap.enabled = false;
 
@@ -89,10 +89,10 @@ export function useSceneCore() {
     }
 
     // 将渲染器添加到DOM
-    container.value.appendChild(renderer.value.domElement);
+    domContainer.appendChild(renderer.value.domElement);
 
-    // 创建控制器
-    controls.value = new OrbitControls(camera.value, renderer.value.domElement);
+    // 同样处理控制器
+    controls.value = markRaw(new OrbitControls(camera.value, renderer.value.domElement));
     controls.value.enableDamping = true;
     controls.value.dampingFactor = 0.05;
     controls.value.minDistance = 2;
@@ -327,6 +327,46 @@ export function useSceneCore() {
     isInitialized.value = false;
   }
 
+  /**
+   * 根据模型边界框重置相机位置
+   * @param {THREE.Object3D} model - 需要聚焦的模型
+   */
+  function resetCameraToFitModel(model) {
+    if (!model || !camera.value) return;
+    
+    // 创建边界框
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    
+    // 找到最大尺寸
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const fov = camera.value.fov * (Math.PI / 180);
+    let cameraDistance = maxDim / (2 * Math.tan(fov / 2));
+    
+    // 添加边距
+    cameraDistance *= 1.5;
+    
+    // 设置相机位置，从稍微上方看向中心
+    camera.value.position.set(
+      center.x,
+      center.y + cameraDistance * 0.5,
+      center.z + cameraDistance
+    );
+    
+    // 设置控制器目标
+    if (controls.value) {
+      controls.value.target.set(center.x, center.y, center.z);
+      controls.value.update();
+    }
+    
+    // 更新投影矩阵
+    camera.value.updateProjectionMatrix();
+    
+    // 强制渲染一次
+    forceRender();
+  }
+
   // 组件销毁前自动清理
   onBeforeUnmount(() => {
     cleanup();
@@ -352,6 +392,7 @@ export function useSceneCore() {
     disposeMaterial,
     saveOriginalCameraState,
     resetCamera,
-    cleanup
+    cleanup,
+    resetCameraToFitModel
   };
 } 

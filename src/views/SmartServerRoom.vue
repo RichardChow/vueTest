@@ -353,81 +353,18 @@ export default {
     
     // 切换到单机架视图
     const switchToSingleRackView = (rackData) => {
-      if (isTransitioning.value) {
-        console.log('正在过渡中，忽略切换请求');
+      if (!serverRoomSceneRef.value) {
+        console.warn("SmartServerRoom: 3D场景组件引用无效，延迟调用");
+        setTimeout(() => switchToSingleRackView(rackData), 100);
         return;
       }
       
-      console.log('切换到单机架视图:', rackData.name);
+      console.log("开始调用serverRoomSceneRef.createSingleRackScene，参数:", rackData);
+      const success = serverRoomSceneRef.value.createSingleRackScene(rackData);
       
-      // 关闭设备详情面板
-      deviceDetailPanelVisible.value = false;
-      selectedDevice.value = null;
-      
-      selectedRack.value = rackData;
-      isTransitioning.value = true;
-      transitionOpacity.value = 0;
-      
-      // 淡出动画
-      const fadeOut = () => {
-        if (transitionOpacity.value < 1) {
-          transitionOpacity.value += 0.1; // 加快速度
-          requestAnimationFrame(fadeOut);
-        } else {
-          // 创建单机架场景
-          if (serverRoomSceneRef.value) {
-            console.log('开始调用serverRoomSceneRef.createSingleRackScene，参数:', rackData);
-            const result = serverRoomSceneRef.value.createSingleRackScene(rackData);
-            
-            if (!result) {
-              console.error('创建单机架场景失败，检查ServerRoomScene组件的createSingleRackScene方法');
-              
-              // 尝试直接获取并检查组件内部实例
-              if (serverRoomSceneRef.value.$refs && serverRoomSceneRef.value.$refs.baseScene) {
-                console.log('尝试访问内部BaseScene组件');
-                const innerScene = serverRoomSceneRef.value.$refs.baseScene;
-                
-                if (innerScene && typeof innerScene.createSingleRackScene === 'function') {
-                  console.log('尝试直接调用内部组件的createSingleRackScene方法');
-                  const innerResult = innerScene.createSingleRackScene(rackData);
-                  console.log('内部调用结果:', innerResult);
-                } else {
-                  console.error('内部组件不存在或方法不可用');
-                }
-              }
-              
-              // 恢复UI状态
-              isTransitioning.value = false;
-              transitionOpacity.value = 0;
-              
-              console.error('serverRoomSceneRef为空，无法访问3D场景组件');
-              return;
-            }
-          } else {
-            console.error('serverRoomSceneRef为空');
-          }
-          
-          // 更新当前视图
-          currentSceneView.value = 'single-rack';
-          
-          // 开始淡入动画
-          fadeIn();
-        }
-      };
-      
-      // 淡入动画
-      const fadeIn = () => {
-        if (transitionOpacity.value > 0) {
-          transitionOpacity.value -= 0.1; // 加快速度
-          requestAnimationFrame(fadeIn);
-        } else {
-          isTransitioning.value = false;
-          console.log('切换到单机架视图完成');
-        }
-      };
-      
-      // 开始动画
-      fadeOut();
+      if (!success) {
+        console.error("创建单机架场景失败，检查ServerRoomScene组件的createSingleRackScene方法");
+      }
     };
 
     // 切换到单设备视图
@@ -807,10 +744,7 @@ export default {
     }
   }
   
-  // 当前是主视图时添加类名
-  &.main-view {
-    // 主视图状态样式
-  }
+
 }
 
 /* Sci-fi Frame - using pseudo-elements */

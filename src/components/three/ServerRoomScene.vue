@@ -298,7 +298,7 @@ export default {
     });
 
     // 集成场景对象管理
-    const { sceneModel, setSceneModel, findAllObjects, highlightObject, resetHighlight } = useSceneObjects();
+    const {setSceneModel, findAllObjects, highlightObject, resetHighlight } = useSceneObjects();
     
     // 监听模型加载完成，更新可交互对象
     watch(() => baseScene.value?.model, (newModel) => {
@@ -353,13 +353,10 @@ export default {
           // --- 内容修改结束 ---
         }
       },
-      onLeave: (object) => {
-        //if (object) {
-        //  resetHighlight(object);
-        //}
+      onLeave: () => {
         hideTooltip();
       },
-      onHover: (object, eventData) => {
+      onHover: (eventData) => {
         if (tooltip.visible) {
           updatePosition(eventData.position.clientX, eventData.position.clientY); 
         }
@@ -487,7 +484,7 @@ export default {
               child.userData.isInteractive = true;
               child.userData.type = DEVICE_TYPES.NE; // 明确设置为NE
               child.userData.category = this.getDeviceCategory(child.name);
-              console.log(`设置交互标记 (Group): ${child.name} -> device`);
+              console.log(`设置交互标记 (Group): ${child.name} -> ne`);
             } else if (child.name.toLowerCase().includes('rack')) {
               // 如果机架是Group
               child.userData.isInteractive = true;

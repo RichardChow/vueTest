@@ -1,8 +1,5 @@
 import * as THREE from 'three';
 import { ref, reactive, shallowRef } from 'vue';
-import { saveOriginalColor, restoreOriginalColor } from '@/utils/threeUtils';
-import { isDevice } from '@/utils/deviceUtils';
-
 /**
  * 场景对象管理和查询功能Composable
  * 提供对象查找、属性设置、分组等功能

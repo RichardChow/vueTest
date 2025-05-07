@@ -2,3 +2,8 @@
 node_modules/.cache/
 node_modules/.cache/babel-loader/
 node_modules/.cache/eslint/
+node_modules
+
+.auto-coder/
+/actions/
+/output.txt
