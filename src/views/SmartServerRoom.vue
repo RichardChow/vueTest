@@ -71,81 +71,149 @@
       
       <template #default>
         <div class="device-details" v-if="selectedDevice">
-          <div class="device-name">{{ selectedDevice.displayName || formatDeviceName(selectedDevice.name) }}</div>
-          <div class="device-type">{{ getDeviceTypeLabel(selectedDevice.type) }}</div>
+          <div class="device-name">{{ deviceData.static.displayName || formatDeviceName(deviceData.static.name) }}</div>
+          <div class="device-type">{{ getDeviceTypeLabel(deviceData.static.type) }}</div>
           
-          <div class="detail-section">
-          <div class="detail-item">
-              <div class="detail-label">状态</div>
-              <div class="detail-value" :class="`status-${selectedDevice.status}`">
-                {{ getStatusLabel(selectedDevice.status) }}
-          </div>
+          <!-- 静态信息区域 -->
+          <div class="detail-section static-section">
+            <div class="section-header">
+              <span class="section-title">基本信息</span>
+              <span class="section-badge static">静态</span>
             </div>
             
-          <div class="detail-item">
+            <div class="detail-item">
               <div class="detail-label">位置</div>
-              <div class="detail-value">{{ selectedDevice.location || '未知' }}</div>
-          </div>
+              <div class="detail-value">{{ deviceData.static.location || '未知' }}</div>
+            </div>
             
             <div class="detail-item">
               <div class="detail-label">序列号</div>
-              <div class="detail-value">{{ selectedDevice.serialNumber || 'N/A' }}</div>
-          </div>
+              <div class="detail-value">{{ deviceData.static.serialNumber || 'N/A' }}</div>
+            </div>
             
             <div class="detail-item">
               <div class="detail-label">IP地址</div>
-              <div class="detail-value">{{ selectedDevice.ipAddress }}</div>
+              <div class="detail-value">{{ deviceData.static.ipAddress || 'N/A' }}</div>
+            </div>
+            
+            <div class="detail-item">
+              <div class="detail-label">MAC地址</div>
+              <div class="detail-value">{{ deviceData.static.macAddress || 'N/A' }}</div>
+            </div>
+            
+            <div class="detail-item">
+              <div class="detail-label">上次维护</div>
+              <div class="detail-value">{{ deviceData.static.lastMaintenance || 'N/A' }}</div>
+            </div>
           </div>
+          
+          <!-- 动态信息区域 -->
+          <div class="detail-section dynamic-section">
+            <div class="section-header">
+              <span class="section-title">实时状态</span>
+              <span class="section-badge dynamic">动态</span>
+              <button 
+                class="btn-refresh" 
+                @click="refreshDynamicData"
+                :disabled="loading.updating"
+                :class="{ spinning: loading.updating }"
+              >
+                <i class="icon-refresh"></i>
+                {{ loading.updating ? '更新中...' : '获取当前信息' }}
+              </button>
+            </div>
+            
+            <div class="detail-item">
+              <div class="detail-label">状态</div>
+              <div class="detail-value" :class="`status-${deviceData.dynamic.status}`">
+                <div class="status-indicator" :class="deviceData.dynamic.status"></div>
+                {{ getStatusLabel(deviceData.dynamic.status) }}
+              </div>
+            </div>
             
             <div class="detail-item">
               <div class="detail-label">温度</div>
-              <div class="detail-value" :class="getTemperatureClass(selectedDevice.temperature)">
-                {{ formatTemperature(selectedDevice.temperature) }}
-          </div>
-          </div>
-          
-          <div class="detail-item">
-              <div class="detail-label">CPU负载</div>
-              <div class="detail-value" :class="getLoadClass(selectedDevice.cpuLoad)">
-                {{ formatPercentage(selectedDevice.cpuLoad) }}
-          </div>
-            </div>
-              
-          <div class="detail-item">
-              <div class="detail-label">内存使用</div>
-              <div class="detail-value" :class="getLoadClass(selectedDevice.memoryUsage)">
-                {{ formatPercentage(selectedDevice.memoryUsage) }}
-          </div>
-            </div>
-          
-          <div class="detail-item">
-              <div class="detail-label">硬盘使用</div>
-              <div class="detail-value" :class="getLoadClass(selectedDevice.diskUsage)">
-                {{ formatPercentage(selectedDevice.diskUsage) }}
-          </div>
+              <div class="detail-value" :class="temperatureStatus">
+                {{ formatTemperature(deviceData.dynamic.temperature) }}
+              </div>
             </div>
             
-          <div class="detail-item">
-              <div class="detail-label">运行时间</div>
-              <div class="detail-value">{{ selectedDevice.uptime || 'N/A' }}</div>
-          </div>
-          
             <div class="detail-item">
-              <div class="detail-label">上次维护</div>
-              <div class="detail-value">{{ selectedDevice.lastMaintenance || 'N/A' }}</div>
-          </div>
-          
+              <div class="detail-label">CPU负载</div>
+              <div class="detail-value" :class="getLoadClass(deviceData.dynamic.cpuUsage)">
+                {{ formatPercentage(deviceData.dynamic.cpuUsage) }}
+                <div class="progress-bar">
+                  <div class="progress-fill" :style="{ width: `${deviceData.dynamic.cpuUsage}%` }"></div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="detail-item">
+              <div class="detail-label">内存使用</div>
+              <div class="detail-value" :class="getLoadClass(deviceData.dynamic.memoryUsage)">
+                {{ formatPercentage(deviceData.dynamic.memoryUsage) }}
+                <div class="progress-bar">
+                  <div class="progress-fill" :style="{ width: `${deviceData.dynamic.memoryUsage}%` }"></div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="detail-item">
+              <div class="detail-label">硬盘使用</div>
+              <div class="detail-value" :class="getLoadClass(deviceData.dynamic.diskUsage)">
+                {{ formatPercentage(deviceData.dynamic.diskUsage) }}
+                <div class="progress-bar">
+                  <div class="progress-fill" :style="{ width: `${deviceData.dynamic.diskUsage}%` }"></div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="detail-item">
+              <div class="detail-label">网络流量</div>
+              <div class="detail-value">
+                <div class="network-stats">
+                  <span class="network-in">↓ {{ formatBytes(deviceData.dynamic.networkIn) }}/s</span>
+                  <span class="network-out">↑ {{ formatBytes(deviceData.dynamic.networkOut) }}/s</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="detail-item">
+              <div class="detail-label">运行时间</div>
+              <div class="detail-value">{{ formatUptime(deviceData.dynamic.uptime) }}</div>
+            </div>
+            
             <div class="detail-item">
               <div class="detail-label">最后更新</div>
-              <div class="detail-value">{{ formatTime(selectedDevice.lastUpdated) }}</div>
+              <div class="detail-value" :class="{ 'outdated': isDataOutdated }">
+                {{ lastUpdateTime }}
+                <span v-if="isDataOutdated" class="outdated-warning">⚠ 数据可能过期</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 操作按钮区域 -->
+          <div class="device-actions">
+            <button class="btn btn-primary" @click="restartDevice" :disabled="!isOnline">
+              <i class="icon-restart"></i>
+              重启设备
+            </button>
+            <button class="btn btn-secondary" @click="showDeviceLogs">
+              <i class="icon-logs"></i>
+              查看日志
+            </button>
+            <button class="btn btn-tertiary" @click="openSSHTerminal" :disabled="!isOnline">
+              <i class="icon-terminal"></i>
+              SSH终端
+            </button>
+          </div>
+          
+          <!-- 错误提示 -->
+          <div v-if="error" class="error-message">
+            <i class="icon-error"></i>
+            {{ error }}
           </div>
         </div>
-          
-          <div class="device-actions">
-            <button class="btn btn-primary" @click="restartDevice">重启设备</button>
-            <button class="btn btn-secondary" @click="showDeviceLogs">查看日志</button>
-        </div>
-      </div>
       </template>
     </base-panel>
     
@@ -171,17 +239,19 @@
 </template>
 
 <script>
-import { ref, reactive, onBeforeUnmount, onMounted, computed } from 'vue';
+import { ref, reactive, onBeforeUnmount, onMounted, computed, watch } from 'vue';
 import ServerRoomScene from '@/components/three/ServerRoomScene.vue';
 import BasePanel from '@/components/ui/BasePanel.vue';
 import { formatTemperature, formatPercentage, formatTime } from '@/utils/formatters';
 import { useWindowResize } from '@/composables/ui/useWindowResize';
+import { useDeviceData } from '@/composables/device/useDeviceData';
 import { 
   isDevice, 
   isNetworkElement, 
   getDeviceTypeLabel,
   formatDeviceName,
-  DEVICE_TYPES 
+  DEVICE_TYPES,
+  detectDevice
 } from '@/utils/deviceUtils';
 
 // 添加formatObjectName作为formatDeviceName的别名
@@ -212,7 +282,25 @@ export default {
     // 3D模型路径
     const modelPath = '/models/interactive/server_room_interactive.gltf';
 
-    // 选中的设备
+    // 使用设备数据管理Composable
+    const {
+      deviceData,
+      loading,
+      error,
+      isOnline,
+      lastUpdateTime,
+      temperatureStatus,
+      systemLoadStatus,
+      fetchDeviceInfo,
+      updateDynamicInfo,
+      clearData,
+      formatUptime,
+      formatBytes,
+      formatPercentage: formatPercentageFromComposable,
+      formatTemperature: formatTemperatureFromComposable
+    } = useDeviceData();
+
+    // 设备详情面板相关
     const selectedDevice = ref(null);
     const deviceDetailPanelVisible = ref(false);
 
@@ -236,8 +324,67 @@ export default {
     // 计算面板位置
     const panelX = computed(() => windowWidth.value - 370);
 
+    // 计算数据是否过期（超过5分钟）
+    const isDataOutdated = computed(() => {
+      if (!deviceData.dynamic.lastUpdated) return true;
+      const now = new Date();
+      const lastUpdate = new Date(deviceData.dynamic.lastUpdated);
+      return (now - lastUpdate) > 5 * 60 * 1000; // 5分钟
+    });
+
+    // 刷新动态数据
+    const refreshDynamicData = async () => {
+      if (!selectedDevice.value) return;
+      
+      try {
+        await updateDynamicInfo(selectedDevice.value.name);
+        console.log('设备动态数据已更新');
+      } catch (err) {
+        console.error('更新设备动态数据失败:', err);
+      }
+    };
+
+    // 加载设备完整信息
+    const loadDeviceData = async (deviceName) => {
+      try {
+        await fetchDeviceInfo(deviceName);
+        console.log('设备数据加载完成:', deviceName);
+      } catch (err) {
+        console.error('加载设备数据失败:', err);
+        // 如果API调用失败，回退到模拟数据
+        generateMockDeviceData(deviceName);
+      }
+    };
+
+    // 生成模拟设备数据（API调用失败时的回退方案）
+    const generateMockDeviceData = (deviceName) => {
+      // 静态信息
+      deviceData.static.name = deviceName;
+      deviceData.static.displayName = formatDeviceName(deviceName);
+      deviceData.static.type = detectDevice({ name: deviceName }) || DEVICE_TYPES.UNKNOWN;
+      deviceData.static.location = selectedRack.value ? formatDeviceName(selectedRack.value.name) : '未知位置';
+      deviceData.static.ipAddress = generateRandomIP();
+      deviceData.static.serialNumber = `SN-${Math.floor(Math.random() * 1000000)}`;
+      deviceData.static.macAddress = generateRandomMAC();
+      
+      const randomLastMaintenance = new Date();
+      randomLastMaintenance.setDate(randomLastMaintenance.getDate() - Math.floor(Math.random() * 90));
+      deviceData.static.lastMaintenance = randomLastMaintenance.toLocaleDateString();
+
+      // 动态信息
+      deviceData.dynamic.status = getRandomStatus();
+      deviceData.dynamic.temperature = 20 + Math.random() * 15;
+      deviceData.dynamic.cpuUsage = Math.random() * 100;
+      deviceData.dynamic.memoryUsage = Math.random() * 100;
+      deviceData.dynamic.diskUsage = Math.random() * 100;
+      deviceData.dynamic.networkIn = Math.random() * 1024 * 1024; // MB/s
+      deviceData.dynamic.networkOut = Math.random() * 512 * 1024; // MB/s
+      deviceData.dynamic.uptime = Math.floor(Math.random() * 30 * 24 * 3600); // 随机30天内的秒数
+      deviceData.dynamic.lastUpdated = new Date().toISOString();
+    };
+
     // 处理对象点击事件
-    const onObjectClicked = (objectData) => {
+    const onObjectClicked = async (objectData) => {
       console.log('对象被点击:', objectData, '当前视图:', currentSceneView.value);
       
       // 诊断信息：检查是否为网元设备
@@ -245,7 +392,7 @@ export default {
       const isDeviceType = objectData.type === DEVICE_TYPES.NE;
       const isDeviceObject = isDevice(objectData);
       console.log('点击诊断:', {
-        对象名称: objectData.name, 
+        对象名称: objectData.name,
         对象类型: objectData.type,
         是网元设备: isNE,
         是设备类型: isDeviceType,
@@ -257,9 +404,6 @@ export default {
         if (objectData.type === DEVICE_TYPES.RACK) {
           // 切换到单机架视图
           switchToSingleRackView(objectData);
-          
-          // 如果之前有设备详情面板显示，关闭它
-          deviceDetailPanelVisible.value = false;
           return;
         } else if (isDeviceObject) {
           // 切换到单设备视图
@@ -270,51 +414,26 @@ export default {
         // 单机架视图中的点击处理
         if (isDeviceObject) {
           console.log('单机架视图中点击设备:', objectData.name);
-          console.log('hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh')
-          handleDeviceClick(objectData);
+          await handleDeviceClick(objectData);
           return;
         } else {
           // 点击了机架或其他非设备对象，不显示设备详情
           deviceDetailPanelVisible.value = false;
-            return;
-          }
+          return;
+        }
       } else if (currentSceneView.value === 'single-device') {
-        // 单设备视图中的点击处理，可以添加特定逻辑
+        // 单设备视图中的点击处理
         console.log('单设备视图中点击:', objectData.name);
+        // 在单设备视图中，确保面板保持打开状态
+        if (!deviceDetailPanelVisible.value) {
+          deviceDetailPanelVisible.value = true;
+        }
+        return;
       }
       
       // 通用点击处理：只有点击设备类型时才显示设备详情面板
       if (isDeviceObject) {
-        const randomUptime = Math.floor(Math.random() * 30) + 1; // 1-30天
-        const randomLastMaintenance = new Date();
-        randomLastMaintenance.setDate(randomLastMaintenance.getDate() - Math.floor(Math.random() * 90)); // 0-90天前
-        
-        selectedDevice.value = {
-          name: objectData.name,
-          displayName: formatDeviceName(objectData.name),
-          type: objectData.type || (
-            isNE ? DEVICE_TYPES.NE : 
-            isDeviceType ? DEVICE_TYPES.NE : 
-            objectData.name && objectData.name.includes('server') ? DEVICE_TYPES.SERVER : 
-            objectData.name && (objectData.name.includes('switch') || objectData.name.includes('router')) ? DEVICE_TYPES.NETWORK : 
-            'device'
-          ),
-          status: getRandomStatus(),
-          ipAddress: generateRandomIP(),
-          temperature: 20 + Math.random() * 15,
-          cpuLoad: Math.random() * 100,
-          memoryUsage: Math.random() * 100,
-          diskUsage: Math.random() * 100,
-          lastUpdated: Date.now(),
-          uptime: `${randomUptime}天`,
-          lastMaintenance: randomLastMaintenance.toLocaleDateString(),
-          location: objectData.name.includes('Rack') ? formatDeviceName(objectData.name) : '未知位置',
-          serialNumber: `SN-${Math.floor(Math.random() * 1000000)}`
-        };
-        
-        // 显示设备详情面板
-        deviceDetailPanelVisible.value = true;
-        console.log('设置设备详情面板显示', selectedDevice.value);
+        await handleDeviceClick(objectData);
       } else {
         // 不是设备类型的对象，不显示设备详情面板
         deviceDetailPanelVisible.value = false;
@@ -322,7 +441,23 @@ export default {
       }
     };
 
-
+    // 处理设备点击
+    const handleDeviceClick = async (deviceData) => {
+      try {
+        // 设置选中设备
+        selectedDevice.value = deviceData;
+        
+        // 加载设备数据
+        await loadDeviceData(deviceData.name);
+        
+        // 显示设备详情面板
+        deviceDetailPanelVisible.value = true;
+        console.log('设备详情面板已显示:', deviceData.name);
+        
+      } catch (err) {
+        console.error('处理设备点击失败:', err);
+      }
+    };
 
     // 场景就绪事件处理
     const onSceneReady = (data) => {
@@ -496,87 +631,6 @@ export default {
       fadeOut();
     };
 
-    // 处理单机架视图中设备的点击
-    const handleDeviceClick = (deviceData) => {
-      console.log('处理设备点击:', deviceData);
-      
-      // 检查是否为有效的设备对象
-      const isValidDevice = isDevice(deviceData);
-      console.log('设备点击诊断:', {
-        对象名称: deviceData.name, 
-        对象类型: deviceData.type,
-        是有效设备: isValidDevice
-      });
-      
-      // 先执行机架旋转动画，使设备正对屏幕
-      if (serverRoomSceneRef.value && typeof serverRoomSceneRef.value.animateRackRotation === 'function') {
-        console.log('执行机架旋转动画');
-        serverRoomSceneRef.value.animateRackRotation(Math.PI/2); // 旋转到0度 (正对屏幕)
-      } else if (serverRoomSceneRef.value && serverRoomSceneRef.value.switchToFrontView) {
-        // 如果直接的旋转方法不可用，尝试使用switchToFrontView
-        console.log('尝试通过switchToFrontView执行旋转');
-        serverRoomSceneRef.value.switchToFrontView();
-      }
-      
-      // 如果ServerRoomScene组件支持设备弹出动画，则调用
-      if (serverRoomSceneRef.value && serverRoomSceneRef.value.animateDevice) {
-        // 这里使用输入的原始名称，增强后的findDeviceByName会处理子部件的情况
-        console.log('执行设备弹出动画:', deviceData.name);
-        const result = serverRoomSceneRef.value.animateDevice(deviceData.name);
-        
-        // 动画执行成功的情况，无论是否点击相同设备
-        if (result) {
-          // 检查是否是已经弹出状态的相同设备 - 这时候复位并关闭详情面板
-          if (serverRoomSceneRef.value.$refs && 
-              serverRoomSceneRef.value.$refs.baseScene && 
-              !serverRoomSceneRef.value.deviceInteractionState.selectedDevice) {
-              deviceDetailPanelVisible.value = false;
-              selectedDevice.value = null;
-              console.log('设备已复位，关闭详情面板');
-              return;
-            }
-          
-          // 准备设备详情数据
-          const randomUptime = Math.floor(Math.random() * 30) + 1; // 1-30天
-          const randomLastMaintenance = new Date();
-          randomLastMaintenance.setDate(randomLastMaintenance.getDate() - Math.floor(Math.random() * 90)); // 0-90天前
-          
-          // 获取更多信息
-          const deviceName = deviceData.name;
-          const isNE = isNetworkElement(deviceName);
-          const isServer = deviceName.includes('server');
-          const isSwitch = deviceName.includes('switch') || deviceName.includes('router');
-          
-          // 更新设备详情数据
-          selectedDevice.value = {
-            name: deviceName,
-            displayName: formatDeviceName(deviceName),
-            type: deviceData.type || (
-              isNE ? DEVICE_TYPES.NE : 
-              isServer ? DEVICE_TYPES.SERVER : 
-              isSwitch ? DEVICE_TYPES.NETWORK : 
-              'device'
-            ),
-            status: getRandomStatus(),
-            ipAddress: generateRandomIP(),
-            temperature: 20 + Math.random() * 15,
-            cpuLoad: Math.random() * 100,
-            memoryUsage: Math.random() * 100,
-            diskUsage: Math.random() * 100,
-            lastUpdated: Date.now(),
-            uptime: `${randomUptime}天`,
-            lastMaintenance: randomLastMaintenance.toLocaleDateString(),
-            location: selectedRack.value ? formatDeviceName(selectedRack.value.name) : '未知位置',
-            serialNumber: `SN-${Math.floor(Math.random() * 1000000)}`
-          };
-          
-          // 显示设备详情面板，强制设置为true
-          deviceDetailPanelVisible.value = true;
-          console.log('handleDeviceClick: 设置面板显示', deviceDetailPanelVisible.value, selectedDevice.value);
-        }
-      }
-    };
-
     const getStatusLabel = (status) => {
       const statusMap = {
         'normal': '正常',
@@ -601,8 +655,8 @@ export default {
 
     // 模拟数据生成函数
     const getRandomStatus = () => {
-      const statuses = ['normal', 'warning', 'error', 'offline'];
-      const weights = [70, 15, 10, 5]; // 权重，使得'normal'更有可能被选中
+      const statuses = ['online', 'warning', 'error', 'offline'];
+      const weights = [70, 15, 10, 5]; // 权重，使得'online'更有可能被选中
       
       const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
       let random = Math.random() * totalWeight;
@@ -619,6 +673,16 @@ export default {
 
     const generateRandomIP = () => {
       return `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+    };
+
+    const generateRandomMAC = () => {
+      const chars = '0123456789ABCDEF';
+      let mac = '';
+      for (let i = 0; i < 12; i++) {
+        if (i > 0 && i % 2 === 0) mac += ':';
+        mac += chars[Math.floor(Math.random() * chars.length)];
+      }
+      return mac;
     };
 
     // 定期更新机房状态数据（模拟实时数据）
@@ -666,6 +730,36 @@ export default {
       clearInterval(updateInterval);
     });
 
+    /* ─────────── 监听设备复位，仅在单机架视图下关闭面板 ─────────── */
+    watch(
+      () => serverRoomSceneRef.value?.deviceInteractionState?.selectedDevice,
+      (newVal, oldVal) => {
+        // 只有在单机架视图下才执行关闭面板
+        if (currentSceneView.value === 'single-rack' && oldVal && !newVal) {
+          console.log('单机架视图检测到设备复位，关闭详情面板');
+          deviceDetailPanelVisible.value = false;
+          selectedDevice.value = null;
+        }
+      }
+    );
+
+    // 新增SSH终端方法
+    const openSSHTerminal = () => {
+      if (!isOnline.value) {
+        alert('设备离线，无法建立SSH连接');
+        return;
+      }
+      
+      if (!deviceData.static.name) {
+        alert('设备信息不完整，无法建立SSH连接');
+        return;
+      }
+      
+      // TODO: 实现SSH终端功能
+      console.log('打开SSH终端:', deviceData.static.name);
+      alert(`SSH终端功能开发中...\n设备: ${deviceData.static.displayName}\nIP: ${deviceData.static.ipAddress}`);
+    };
+
     return {
       roomStatus,
       currentTime,
@@ -698,11 +792,21 @@ export default {
       switchToSingleRackView,
       switchToSingleDeviceView,
       switchToMainView,
-      handleDeviceClick,
-      formatObjectName,
       onViewChanged,
       basePanelRef,
-      panelX
+      panelX,
+      isDataOutdated,
+      lastUpdateTime,
+      temperatureStatus,
+      systemLoadStatus,
+      fetchDeviceInfo,
+      updateDynamicInfo,
+      clearData,
+      formatUptime,
+      formatBytes,
+      formatPercentageFromComposable,
+      formatTemperatureFromComposable,
+      openSSHTerminal
     };
   }
 };

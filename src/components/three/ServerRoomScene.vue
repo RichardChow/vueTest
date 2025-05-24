@@ -28,13 +28,10 @@
 <script>
 import BaseThreeScene from '@/components/three/BaseThreeScene.vue';
 import * as THREE from 'three';
-import { markRaw, nextTick, ref, reactive, watch, onMounted, getCurrentInstance } from 'vue';
+import { nextTick, ref, reactive, watch, onMounted, getCurrentInstance } from 'vue';
 import { 
-  isDevice, 
-  isNetworkElement, 
-  setupDeviceProperties, 
-  DEVICE_TYPES,
-  formatDeviceName // <--- 新增导入
+  formatDeviceName,
+  processModelParents
 } from '@/utils/deviceUtils';
 import { 
   createColorMap, 
@@ -92,11 +89,22 @@ export default {
     const deviceInteractionState = reactive({
         selectedDevice: null,
         hoveredDevice: null,
-      originalColors: new Map(), // 旧的颜色储存方式，保留向后兼容
-      originalPositions: new Map(), // 保存原始位置
-      colorMap: createColorMap(), // 新的颜色管理对象
+      originalColors: new Map(),
+      originalPositions: new Map(),
+      colorMap: createColorMap(),
       isSceneReady: false,
-      lastHighlightedObject: null
+      lastHighlightedObject: null,
+      
+      // 添加索引化存储 
+      deviceMap: new Map(), // 名称 -> 设备对象
+      rackMap: new Map(),   // 名称 -> 机架对象
+      devicesByType: {},    // 类型 -> 设备数组
+      devicesByRack: {},     // 机架 -> 设备数组
+      objectParentMap: new Map(), // 对象ID到其父对象的映射
+      interactiveObjectsSet: new Set(), // 可交互对象集合
+
+      // === 新增：机架到设备的精确映射 ===
+      rackToDevicesMap: new Map() // rackName -> deviceObject[]
     });
     
       // 场景状态
@@ -237,7 +245,8 @@ export default {
       onObjectClick,
       onObjectHover,
       getHoveredObject,
-      setPickableObjects
+      setPickableObjects,
+      setObjectParentMap
     } = useSceneInteractions();
 
     const {
@@ -298,7 +307,7 @@ export default {
     });
 
     // 集成场景对象管理
-    const {setSceneModel, findAllObjects, highlightObject, resetHighlight } = useSceneObjects();
+    const {setSceneModel, highlightObject, resetHighlight } = useSceneObjects();
     
     // 监听模型加载完成，更新可交互对象
     watch(() => baseScene.value?.model, (newModel) => {
@@ -306,7 +315,13 @@ export default {
         setPickableObjects(newModel);
         // 设置场景模型并查找所有对象
         setSceneModel(newModel);
-        findAllObjects();
+
+        // 在处理模型后建立对象ID到父对象的映射
+        newModel.traverse(object => {
+          if (object.parent && object.parent !== newModel) {
+            deviceInteractionState.objectParentMap.set(object.id, object.parent);
+          }
+        });
       }
     }, { immediate: true });
 
@@ -342,15 +357,15 @@ export default {
           
           const type = object.userData?.status === 'error' ? 'error' : 
                        object.userData?.status === 'warning' ? 'warning' : 'info';
-          
-          showTooltip({ 
-            title: title, 
-            content: content, 
-            type: type,
-            x: eventData.position.clientX,
-            y: eventData.position.clientY,
-          });
-          // --- 内容修改结束 ---
+          if (sceneState.currentView === 'main') {
+            showTooltip({ 
+              title: title, 
+              content: content, 
+              type: type,
+              x: eventData.position.clientX,
+              y: eventData.position.clientY,
+            });
+          }
         }
       },
       onLeave: () => {
@@ -363,6 +378,8 @@ export default {
       }
     });
 
+    
+    const modelProcessed = ref(false);
     
     return {
       deviceInteractionState,
@@ -386,12 +403,15 @@ export default {
       interactionState,
       getHoveredObject,
       methodsRef,
-      tooltip, // <--- 修改这里
-      tooltipStyle, // <--- 新增返回
+      tooltip,
+      tooltipStyle,
       rackViewUtils,
       highlightObject,
       resetHighlight,
       animate,
+      modelProcessed,
+      setObjectParentMap,
+      setPickableObjects
     };
   },
   computed: {
@@ -420,80 +440,69 @@ export default {
     }
   },
   methods: {
+
     // 处理模型加载完成事件
     handleModelLoaded(data) {
+      // 检查模型是否已处理
+      if (this.modelProcessed) {
+        console.log('模型已处理，跳过重复处理');
+        return;
+      }
+      
       console.log('服务器房间模型已加载:', data.modelName);
       
       // 获取模型引用
       const model = this.$refs.baseScene.model;
       this.sceneState.mainScene = model;
       
-      // 处理模型对象，设置自定义交互属性
-      if (model) {
-        model.traverse((child) => {
-          if (child.isMesh || child.isGroup) {
-            // 保存原始颜色
-            if (child.material) {
-              // 如果是数组，保存每个材质的颜色
-              if (Array.isArray(child.material)) {
-                child.material.forEach((mat, index) => {
-                  if (mat.color) {
-                    this.deviceInteractionState.originalColors.set(
-                      `${child.id}_${index}`, 
-                      markRaw(mat.color.clone())
-                    );
-                  }
-                });
-              } else if (child.material.color) {
-                // 单个材质的情况
-                this.deviceInteractionState.originalColors.set(
-                  child.id, 
-                  markRaw(child.material.color.clone())
-                );
-              }
-              
-              // 保存原始位置
-              this.deviceInteractionState.originalPositions.set(
-                child.id, 
-                markRaw(child.position.clone())
-              );
-            }
-            
-            // 使用工具函数设置设备属性，更加简洁和统一
-            if (isDevice(child)) {
-              console.log('标记为设备:', child.name);
-              // 设置设备属性
-              setupDeviceProperties(child);
-              
-              // 兼容旧代码，对NE_开头的设备特殊处理
-              if (isNetworkElement(child.name) && (!child.userData.type || child.userData.type === 'device')) {
-                child.userData.type = DEVICE_TYPES.NE;
-              }
-            } else if (child.name.toLowerCase().includes('rack')) {
-              // 通常机架主体是Group，但以防万一也检查Mesh
-              child.userData.isInteractive = true;
-              child.userData.type = DEVICE_TYPES.RACK;
-              console.log(`设置交互标记 (Mesh): ${child.name} -> rack`);
-            }
+      // 创建全局状态对象
+      const globalState = {
+        originalMaterials: new Map(),
+        originalPositions: new Map(),
+        devices: [],
+        racks: []
+      };
+      
+      // 在这里调用processModelParents进行业务处理
+      const processedObjects = processModelParents(model, globalState);
+      
+      // 将处理结果保存在当前组件的状态中
+      this.deviceInteractionState.devices = globalState.devices;
+      this.deviceInteractionState.racks = globalState.racks;
+      this.deviceInteractionState.originalMaterials = globalState.originalMaterials;
+      this.deviceInteractionState.originalPositions = globalState.originalPositions;
+      
+      console.log(`处理了 ${processedObjects.length} 个父对象，${globalState.devices.length} 个设备，${globalState.racks.length} 个机架`);
+      
+      // === 新增：构建 rackToDevicesMap ===
+      console.log('开始构建 rackToDevicesMap...');
+      this.deviceInteractionState.rackToDevicesMap.clear(); // 清空旧映射
+      globalState.devices.forEach(device => {
+        // 确保设备有 details 和 rack 信息
+        if (device.userData?.details?.rack) {
+          const rackId = device.userData.details.rack; // 例如 "Rack-01"
+          if (!this.deviceInteractionState.rackToDevicesMap.has(rackId)) {
+            this.deviceInteractionState.rackToDevicesMap.set(rackId, []);
           }
-          
-          // --- 新增：检查 Group 对象 ---
-          if (child.isGroup) {
-            if (isNetworkElement(child.name)) {
-              // 如果设备本身是Group
-              child.userData.isInteractive = true;
-              child.userData.type = DEVICE_TYPES.NE; // 明确设置为NE
-              child.userData.category = this.getDeviceCategory(child.name);
-              console.log(`设置交互标记 (Group): ${child.name} -> ne`);
-            } else if (child.name.toLowerCase().includes('rack')) {
-              // 如果机架是Group
-              child.userData.isInteractive = true;
-              child.userData.type = DEVICE_TYPES.RACK;
-              console.log(`设置交互标记 (Group): ${child.name} -> rack`);
-            }
+          this.deviceInteractionState.rackToDevicesMap.get(rackId).push(device);
+        } else {
+          // 可以选择记录没有关联机架的设备
+          // console.warn(`设备 ${device.name} 没有找到关联的机架ID`);
+          const unknownRackId = 'UNKNOWN_RACK';
+          if (!this.deviceInteractionState.rackToDevicesMap.has(unknownRackId)) {
+            this.deviceInteractionState.rackToDevicesMap.set(unknownRackId, []);
           }
-        });
-      }
+          this.deviceInteractionState.rackToDevicesMap.get(unknownRackId).push(device);
+        }
+      });
+      console.log('rackToDevicesMap 构建完成:', this.deviceInteractionState.rackToDevicesMap);
+      // === 构建映射结束 ===
+
+      // 构建对象父级映射和可交互对象集合
+      this.buildObjectMappings(model);
+      
+      // 标记模型已处理
+      this.modelProcessed = true;
       
       // 保存原始相机位置和控制器目标
       if (this.$refs.baseScene.camera) {
@@ -504,21 +513,46 @@ export default {
       }
       
       // 转发事件到父组件
-      this.$emit('model-loaded', data);
-    },
-    
-    // 获取设备分类
-    getDeviceCategory(deviceName) {
-      if (deviceName.includes('server')) return 'server';
-      if (deviceName.includes('switch')) return 'network';
-      if (deviceName.includes('router')) return 'network';
-      if (deviceName.includes('storage')) return 'storage';
-      return 'unknown';
+      this.$emit('model-loaded', {
+        modelName: data.modelName,
+        deviceCount: globalState.devices.length,
+        rackCount: globalState.racks.length
+      });
+      
+      // 创建旧的索引 (这部分现在可以被 rackToDevicesMap 替代或增强，暂时保留)
+      this.buildIndexMappings(globalState);
     },
     
     // 处理对象点击事件
     handleObjectClick(data) {
-      console.log('对象点击:', data);
+      console.log('原始点击数据:', data); // 诊断用
+      
+      // 如果在单设备视图中，使用存储的selectedDevice信息
+      if (this.sceneState.currentView === 'single-device' && 
+          this.sceneState.selectedDevice) {
+        
+        // 创建新的数据对象，使用已保存的设备信息
+        data = { 
+          ...data, 
+          name: this.sceneState.selectedDevice.name,
+          type: this.sceneState.selectedDevice.type || 'NE'
+        };
+        
+        console.log('已使用已保存的设备信息更新事件数据:', data.name);
+      }
+      
+      // 如果在单机架视图中点击机架子对象，使用当前选中机架名称
+      else if (this.sceneState.currentView === 'single-rack' && 
+               data.type === 'rack' && 
+               this.sceneState.selectedRack) {
+        
+        // 创建新的数据对象，保持原始数据其他部分不变
+        data = { 
+          ...data, 
+          name: this.sceneState.selectedRack.name,
+          type: 'Rack'  // 与主视图保持一致
+        };
+      }
       
       // 根据当前视图处理点击事件
       if (this.sceneState.currentView === 'single-rack') {
@@ -561,7 +595,7 @@ export default {
     
     // 单设备视图中的点击处理
     handleSingleDeviceViewClick(data) {
-      console.log('单设备视图中点击:', data.name, data.type);
+      console.log('单设备视图中点击111:', data.name, data.type);
       // 在单设备视图中可以实现其他交互，如部件动画等
     },
     
@@ -598,11 +632,22 @@ export default {
       getObjectByName: this.getObjectByName.bind(this),
       setupDeviceInteractivity: this.setupDeviceInteractivity.bind(this),
       sceneState: this.sceneState,
-      emitViewChanged: (data) => this.$emit('view-changed', data)
+      emitViewChanged: (data) => this.$emit('view-changed', data),
+      setPickableObjects: this.setPickableObjects,
+      setObjectParentMap: this.setObjectParentMap
     };
     
     // 调用composable中的实现
-    return this._createSingleDeviceScene(deviceData, context);
+    const result = this._createSingleDeviceScene(deviceData, context);
+
+    // === 新增：切换pickable对象 ===
+    if (result && this.sceneState.singleDeviceScene) {
+      const pickable = this.buildObjectMappings(this.sceneState.singleDeviceScene);
+      this.setPickableObjects(pickable);
+      console.log('single-device: pickable 对象已更新');
+    }
+    
+    return result;
     },
 
     // 重置到主视图
@@ -630,10 +675,44 @@ export default {
       // 根据当前视图类型，选择对应的重置方法
       if (this.sceneState.currentView === 'single-rack') {
         result = this.destroySingleRackScene(context);
+        
+        // 备份重置逻辑
+        if (this.rackViewState) {
+          this.rackViewState.firstNetworkElementClick = true;
+          this.rackViewState.isFrontView = false;
+          console.log('resetToMainScene: 备份重置rackViewState关键状态');
+        }
       } else if (this.sceneState.currentView === 'single-device') {
         result = this.destroySingleDeviceScene(context);
       }
 
+      // 修改这一段：主动同步构建主场景的交互对象列表
+      if (this.$refs.baseScene?.model) {
+        // 立即构建主视图的交互对象数组
+        const interactive = [];
+        const parentMap = new Map();
+        
+        // 同步遍历一次
+        this.$refs.baseScene.model.traverse(obj => {
+          if (obj.userData?.isInteractive) {
+            interactive.push(obj);
+          }
+          if (obj.parent && obj.parent !== this.$refs.baseScene.model) {
+            parentMap.set(obj.id, obj.parent);
+          }
+        });
+        
+        // 立即更新
+        this.setPickableObjects(interactive);
+        this.setObjectParentMap(parentMap);
+        
+        // 补充更新状态
+        this.deviceInteractionState.objectParentMap = parentMap;
+        this.deviceInteractionState.interactiveObjectsSet = new Set(interactive);
+        
+        console.log(`返回主视图: 设置了 ${interactive.length} 个可拾取对象，${parentMap.size} 个父级映射`);
+      }
+      
       // 清理直接事件处理
       this.cleanupDirectEventHandling();
 
@@ -699,7 +778,7 @@ export default {
           // 处理材质数组
           if (Array.isArray(object.material)) {
             object.material.forEach(material => this.disposeMaterial(material));
-          } else {
+            } else {
             // 处理单个材质
             this.disposeMaterial(object.material);
           }
@@ -754,33 +833,94 @@ export default {
     
     // 创建单机架视图 - 组件层面的方法
     createSingleRackScene(rackData) {
-    if (!this.$refs.baseScene || !this.$refs.baseScene.model) {
-      console.error('缺少基础场景或模型引用');
-      return false;
+      if (!this.$refs.baseScene || !this.$refs.baseScene.model) {
+        console.error('缺少基础场景或模型引用');
+        return false;
+      }
+      
+      // 记录当前的相机状态，以便之后返回
+      if (!this.sceneState.originalCameraPosition) {
+        this.sceneState.originalCameraPosition = this.$refs.baseScene.camera.position.clone();
+        this.sceneState.originalControlsTarget = this.$refs.baseScene.controls.target.clone();
+      }
+      
+      // 构建上下文对象，包含所有必要的引用
+      const context = {
+        scene: this.$refs.baseScene.scene,
+        camera: this.$refs.baseScene.camera,
+        renderer: this.$refs.baseScene.renderer,
+        controls: this.$refs.baseScene.controls,
+        mainModel: this.$refs.baseScene.model,
+        getObjectByName: this.getObjectByName.bind(this),
+        setupDeviceInteractivity: this.setupDeviceInteractivity.bind(this),
+        sceneState: this.sceneState,
+        deviceInteractionState: this.deviceInteractionState,
+        emitViewChanged: (data) => this.$emit('view-changed', data),
+        setPickableObjects: this.setPickableObjects,
+        setObjectParentMap: this.setObjectParentMap
+      };
+      
+      // 调用composable中的实现
+      const result = this._createSingleRackScene(rackData, context);
+
+      return result;
+    },
+
+    buildObjectMappings(model) {
+      const interactive = [];
+      const task = () => {
+        this.deviceInteractionState.objectParentMap.clear();
+        this.deviceInteractionState.interactiveObjectsSet.clear();
+
+        model.traverse(obj => {
+          if (obj.parent && obj.parent !== model) {
+            this.deviceInteractionState.objectParentMap.set(obj.id, obj.parent);
+          }
+          if (obj.userData?.isInteractive) {
+            this.deviceInteractionState.interactiveObjectsSet.add(obj);
+            interactive.push(obj);
+          }
+        });
+
+        // 把父级映射发给交互系统
+        this.setObjectParentMap?.(this.deviceInteractionState.objectParentMap);
+        console.log(
+          `映射完成: ${interactive.length} 可交互对象 / ` +
+          `${this.deviceInteractionState.objectParentMap.size} 父级映射`);
+      };
+
+      window.requestIdleCallback ? window.requestIdleCallback(task) : setTimeout(task);
+      return interactive;
+    },
+
+    buildIndexMappings(globalState) {
+      // 创建设备索引
+      globalState.devices.forEach(device => {
+        // 按名称索引
+        this.deviceInteractionState.deviceMap.set(device.name, device);
+        
+        // 按类型索引
+        const type = device.userData.type || 'unknown';
+        if (!this.deviceInteractionState.devicesByType[type]) {
+          this.deviceInteractionState.devicesByType[type] = [];
+        }
+        this.deviceInteractionState.devicesByType[type].push(device);
+        
+        // 按机架索引
+        const rackId = device.userData.details?.rack || 'unknown';
+        if (rackId !== 'unknown') {
+          if (!this.deviceInteractionState.devicesByRack[rackId]) {
+            this.deviceInteractionState.devicesByRack[rackId] = [];
+          }
+          this.deviceInteractionState.devicesByRack[rackId].push(device);
+        }
+      });
+
+      // 创建机架索引
+      globalState.racks.forEach(rack => {
+        this.deviceInteractionState.rackMap.set(rack.name, rack);
+      });
     }
-    
-    // 记录当前的相机状态，以便之后返回
-    if (!this.sceneState.originalCameraPosition) {
-      this.sceneState.originalCameraPosition = this.$refs.baseScene.camera.position.clone();
-      this.sceneState.originalControlsTarget = this.$refs.baseScene.controls.target.clone();
-    }
-    
-    // 构建上下文对象，包含所有必要的引用
-    const context = {
-      scene: this.$refs.baseScene.scene,
-      camera: this.$refs.baseScene.camera,
-      renderer: this.$refs.baseScene.renderer,
-      controls: this.$refs.baseScene.controls,
-      mainModel: this.$refs.baseScene.model,
-      getObjectByName: this.getObjectByName.bind(this),
-      setupDeviceInteractivity: this.setupDeviceInteractivity.bind(this),
-      sceneState: this.sceneState,
-      emitViewChanged: (data) => this.$emit('view-changed', data)
-    };
-    
-    // 调用composable中的实现
-    return this._createSingleRackScene(rackData, context);
-  }
   },
   
   mounted() {
@@ -796,14 +936,15 @@ export default {
       
       // 注册鼠标移动事件监听器，直接在本组件处理
       if (this.$refs.baseScene && this.$refs.baseScene.$refs.container) {
-        const container = this.$refs.baseScene.$refs.container;
+        // const container = this.$refs.baseScene.$refs.container;
+        const container = this.$refs.baseScene.$el
         //container.addEventListener('mousemove', this.onDirectMouseMove);
         console.log('已注册直接鼠标移动事件处理器');
         
         // 获取容器尺寸
         this.width = container.clientWidth;
         this.height = container.clientHeight;
-      } else {
+          } else {
         console.warn('无法获取容器引用，未能注册直接鼠标移动事件处理器');
       }
     });
@@ -821,8 +962,8 @@ export default {
     window.removeEventListener('resize', this.onWindowResize, false);
     
     // 取消任何可能正在进行的动画
-    if (window.animationFrameId) {
-      cancelAnimationFrame(window.animationFrameId);
+      if (window.animationFrameId) {
+        cancelAnimationFrame(window.animationFrameId);
       window.animationFrameId = null;
     }
     
@@ -864,20 +1005,8 @@ export default {
     }
     
     this.cleanupDirectEventHandling();
-  },
-  
-  // 设置设备交互属性
-  setupDeviceInteractivity(deviceObject) {
-    // 设置设备为可交互
-    if (!deviceObject.userData) deviceObject.userData = {};
-    deviceObject.userData.isInteractive = true;
     
-    // 如果是网元设备，设置相应类型
-    if (deviceObject.name && deviceObject.name.startsWith('NE_')) {
-      deviceObject.userData.type = 'NE';
-    } else {
-      deviceObject.userData.type = 'device';
-    }
-  }
+    this.modelProcessed = false;
+  },
 };
 </script>

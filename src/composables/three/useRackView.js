@@ -24,8 +24,8 @@ export function useRackView() {
   
   /**
    * 创建单机架视图
-   * @param {Object} rackData - 机架数据
-   * @param {Object} context - 场景上下文
+   * @param {Object} rackData - 机架数据 (包含被点击机架的名称等)
+   * @param {Object} context - 场景上下文，包含 deviceInteractionState
    * @returns {Boolean} 是否成功创建
    */
   function createSingleRackScene(rackData, context) {
@@ -38,99 +38,68 @@ export function useRackView() {
       getObjectByName, 
       setupDeviceInteractivity,
       sceneState,
-      emitViewChanged
+      deviceInteractionState,
+      emitViewChanged,
+      setPickableObjects,
+      setObjectParentMap
     } = context;
     
     if (!scene || !mainModel) {
-      console.error('缺少基础场景或模型引用');
+      console.error('useRackView: 缺少基础场景或模型引用');
       return false;
     }
     
-    console.log('创建单机架视图，参数:', rackData);
+    if (!deviceInteractionState || !deviceInteractionState.rackToDevicesMap) {
+      console.error('useRackView: deviceInteractionState 或 rackToDevicesMap 未提供');
+      return false;
+    }
     
-    // 保存选中的机架信息
+    console.log('useRackView: 创建单机架视图，参数:', rackData);
+    
     rackViewState.selectedRack = rackData;
-    
-    // 更新组件状态
     if (sceneState) {
       sceneState.selectedRack = rackData;
     }
     
-    // 查找选中的机架对象
     const rackObject = getObjectByName(rackData.name);
     if (!rackObject) {
-      console.error('找不到机架对象:', rackData.name);
+      console.error('useRackView: 找不到机架对象:', rackData.name);
       return false;
     }
     
-    console.log('找到机架对象:', rackObject.name, '位置:', rackObject.position);
+    console.log('useRackView: 找到机架对象:', rackObject.name, '位置:', rackObject.position);
     
     try {
-      // 提取机架名称，用于匹配相关设备
-      let rackBaseName = '';
-      if (rackData.name.includes('Rack-')) {
-        rackBaseName = rackData.name.split('_')[0]; // 获取"Rack-XX"部分
-        console.log('提取的机架基本名称:', rackBaseName);
-      } else {
-        // 如果没有标准命名，使用整个名称
+      let rackBaseName = rackData.name; 
+      if (rackData.name.includes('_')) {
+        rackBaseName = rackData.name.split('_')[0];
+      } else if (rackData.name.startsWith('Rack-') && !rackData.name.includes(' ')) {
         rackBaseName = rackData.name;
       }
       
-      // 创建新的场景
-      const mainScene = scene;
-      const sceneChildren = [...mainScene.children];
-      sceneChildren.forEach(child => {
-        if (child !== mainModel && !child.isLight) {
-          mainScene.remove(child);
-        }
-      });
+      console.log('useRackView: 提取的机架基本名称 (用于查找设备):', rackBaseName);
       
-      // 1. 清除原始模型，并创建一个新的场景容器
+      const mainScene = scene;
       mainScene.remove(mainModel);
       
-      // 2. 创建新的场景容器
       const sceneContainer = new THREE.Group();
+      sceneContainer.name = "SingleRackSceneContainer";
       mainScene.add(sceneContainer);
       
-      // 3. 创建原点，用于放置机架和设备
       const origin = new THREE.Group();
-      // 将整个机架组向上移动一点，避开底部黑色区域
-      origin.position.y = -0.2; // 向上移动一小段距离
+      origin.position.y = -0.2;
       sceneContainer.add(origin);
       
-      // 4. 克隆机架并添加到新场景
       const rackClone = rackObject.clone(true);
-      rackClone.position.set(0, 0, 0); // 重置位置到原点
+      rackClone.position.set(0, 0, 0);
       origin.add(rackClone);
       
-      // 5. 确保机架材质正确
+      // 创建搜集交互对象和父级映射的数组和Map
+      const interactiveObjects = [];
+      const parentMapping = new Map();
+      
       rackClone.traverse((child) => {
         if (child.isMesh && child.material) {
-          // 处理数组材质
-          if (Array.isArray(child.material)) {
-            child.material = child.material.map(mat => {
-              // 克隆材质确保独立性
-              const newMat = mat.clone();
-              // 确保不是黑色
-              if (newMat.color && newMat.color.r === 0 && newMat.color.g === 0 && newMat.color.b === 0) {
-                newMat.color.setRGB(0.8, 0.8, 0.8);
-              }
-              return newMat;
-            });
-          } 
-          // 处理单个材质
-          else {
-            // 克隆材质确保独立性
-            child.material = child.material.clone();
-            if (child.material.color && 
-                child.material.color.r === 0 && 
-                child.material.color.g === 0 && 
-                child.material.color.b === 0) {
-              child.material.color.setRGB(0.8, 0.8, 0.8);
-            }
-          }
-          
-          // 设置交互标记
           child.userData.isInteractive = true;
           child.userData.type = 'rack';
           child.userData.originalMaterial = {
@@ -138,144 +107,118 @@ export function useRackView() {
             opacity: child.material.opacity || 1.0,
             transparent: child.material.transparent || false
           };
-          
-          // 禁用阴影
           child.castShadow = false;
           child.receiveShadow = false;
+          
+          // 添加到交互对象数组
+          interactiveObjects.push(child);
+          
+          // 记录父级映射关系
+          if (child.parent && child.parent !== rackClone) {
+            parentMapping.set(child.id, child.parent);
+          }
+          
+          // 添加这一行，保存父级机架信息
+          child.userData.parentRack = {
+            name: rackData.name,
+            type: 'rack'
+          };
         }
       });
       
-      // 6. 保存原始机架位置，用于计算设备相对位置
       const rackOriginalPosition = rackObject.position.clone();
       
-      // 7. 查找并添加相关设备
       let deviceCount = 0;
-      mainModel.traverse((child) => {
-        // 查找与该机架相关的设备
-        if (child.name && child.name.startsWith('NE_') && child.name.includes(rackBaseName)) {
-          console.log("找到设备:", child.name);
+      const devicesForThisRack = deviceInteractionState.rackToDevicesMap.get(rackBaseName);
+
+      if (devicesForThisRack && devicesForThisRack.length > 0) {
+        console.log(`useRackView: 找到 ${devicesForThisRack.length} 个设备`);
+        
+        devicesForThisRack.forEach(deviceObjectFromMap => {
+          const deviceClone = deviceObjectFromMap.clone(true);
           
-          // 克隆设备
-          const deviceClone = child.clone(true);
-          
-          // 计算设备相对于原始机架的偏移量
           const relativePosition = new THREE.Vector3().subVectors(
-            child.position, 
+            deviceObjectFromMap.position, 
             rackOriginalPosition
           );
-          
-          // 设置设备相对于机架的位置
           deviceClone.position.copy(relativePosition);
           
-          // 确保设备材质正确
           deviceClone.traverse((subChild) => {
             if (subChild.isMesh && subChild.material) {
-              // 处理数组材质
-              if (Array.isArray(subChild.material)) {
-                subChild.material = subChild.material.map(mat => {
-                  // 克隆材质确保独立性
-                  const newMat = mat.clone();
-                  // 确保不是黑色
-                  if (newMat.color && newMat.color.r === 0 && newMat.color.g === 0 && newMat.color.b === 0) {
-                    newMat.color.setRGB(0.8, 0.8, 0.8);
-                  }
-                  return newMat;
-                });
-              } 
-              // 处理单个材质
-              else {
-                // 克隆材质确保独立性
-                subChild.material = subChild.material.clone();
-                if (subChild.material.color && 
-                    subChild.material.color.r === 0 && 
-                    subChild.material.color.g === 0 && 
-                    subChild.material.color.b === 0) {
-                  subChild.material.color.setRGB(0.8, 0.8, 0.8);
-                }
-              }
-              
-              // 设置交互标记
               subChild.userData.isInteractive = true;
               subChild.userData.type = 'device';
-              subChild.userData.originalDevice = child.name;
+              subChild.userData.originalDevice = deviceObjectFromMap.name;
               subChild.userData.originalMaterial = {
                 color: subChild.material.color ? subChild.material.color.clone() : new THREE.Color(0xcccccc),
                 opacity: subChild.material.opacity || 1.0,
                 transparent: subChild.material.transparent || false
               };
-              
-              // 禁用阴影
               subChild.castShadow = false;
               subChild.receiveShadow = false;
+              
+              // 添加到交互对象数组
+              interactiveObjects.push(subChild);
+              
+              // 记录父级映射关系
+              if (subChild.parent && subChild.parent !== deviceClone) {
+                parentMapping.set(subChild.id, subChild.parent);
+              }
             }
           });
           
-          // 记录设备原始位置，用于后续动画
           if (sceneState && sceneState.currentDevicePositions) {
             sceneState.currentDevicePositions.set(deviceClone.id, deviceClone.position.clone());
           }
           
-          // 添加到场景原点
           origin.add(deviceClone);
           deviceCount++;
           
-          // 设置设备交互
           if (setupDeviceInteractivity) {
             setupDeviceInteractivity(deviceClone);
           }
-          
-          console.log(`添加设备到单机架视图: ${child.name}`);
-        }
-      });
-      
-      console.log(`添加了 ${deviceCount} 个设备到单机架视图`);
-      
-      // 8. 旋转整个原点以获得更好的视角
-      origin.rotation.y = Math.PI / 4; // 改为45度，以获得侧面视图效果
-      if (sceneState) {
-        sceneState.isFrontView = false; // 初始设置为侧面视图
+        });
+      } else {
+        console.warn(`useRackView: 未能在 rackToDevicesMap 中为机架 "${rackBaseName}" 找到任何设备。`);
       }
       
-      // 10. 调整相机视角
-      // 计算边界框，用于定位相机
+      console.log(`useRackView: 添加了 ${deviceCount} 个设备到单机架视图`);
+      
+      origin.rotation.y = Math.PI / 4;
+      if (sceneState) {
+        sceneState.isFrontView = false;
+      }
+      
       const box = new THREE.Box3().setFromObject(sceneContainer);
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3());
       
-      // 计算适当的相机距离
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = camera.fov * (Math.PI / 180);
       const cameraDistance = (maxDim / 2) / Math.tan(fov / 2) * 1.2;
       
-      // 设置相机位置 - 修改为更平行的视角（减少Y轴高度）
       camera.position.set(
         center.x, 
-        center.y + maxDim * 0.3, // 原来是0.7，现在降低为0.3，减少俯视角度
-        center.z + cameraDistance * 1.0 // 原来是0.8，现在增加到1.0，让相机距离更远一些
+        center.y + maxDim * 0.3,
+        center.z + cameraDistance * 1.0
       );
       
-      // 设置相机目标 - 稍微调整目标点，让视线更加水平
       controls.target.set(
         center.x,
-        center.y + maxDim * 0.1 - 0.2, // 减去0.2以匹配机架的上移
+        center.y + maxDim * 0.1 - 0.2,
         center.z
       );
       controls.update();
       
-      // 强制更新矩阵以确保准确的交互计算
       sceneContainer.updateWorldMatrix(true, true);
       
-      // 强制重绘场景
       if (renderer) {
         renderer.render(mainScene, camera);
       }
       
-      // 保存状态
       rackViewState.isActive = true;
       rackViewState.sceneContainer = sceneContainer;
       rackViewState.sceneOrigin = origin;
       
-      // 更新组件状态
       if (sceneState) {
         sceneState.currentView = 'single-rack';
         sceneState.singleRackScene = sceneContainer;
@@ -283,7 +226,6 @@ export function useRackView() {
         sceneState.singleRackOrigin = origin;
       }
       
-      // 通知父组件视图已变更
       if (emitViewChanged) {
         emitViewChanged({
           view: 'single-rack',
@@ -291,13 +233,34 @@ export function useRackView() {
         });
       }
       
-      // 重置第一次点击标记
       rackViewState.firstNetworkElementClick = true;
       
-      console.log('单机架视图创建完成');
+      // ===== 新增：直接设置交互对象和映射 =====
+      // 1. 更新父级映射
+      if (setObjectParentMap) {
+        setObjectParentMap(parentMapping);
+        console.log(`useRackView: 设置了 ${parentMapping.size} 个父级映射关系`);
+      }
+      
+      // 2. 直接设置可拾取对象
+      if (setPickableObjects) {
+        setPickableObjects(interactiveObjects);
+        console.log(`useRackView: 设置了 ${interactiveObjects.length} 个可拾取对象`);
+      }
+      
+      // 同时更新状态，方便其他地方使用
+      if (deviceInteractionState) {
+        deviceInteractionState.objectParentMap = parentMapping;
+        deviceInteractionState.interactiveObjectsSet = new Set(interactiveObjects);
+      }
+      
+      console.log('useRackView: 单机架视图创建完成，场景容器名称:', sceneContainer.name);
       return true;
     } catch (error) {
-      console.error('创建单机架视图时出错:', error);
+      console.error('useRackView: 创建单机架视图时出错:', error);
+      if (mainModel && !scene.children.includes(mainModel)) {
+        scene.add(mainModel);
+      }
       return false;
     }
   }
@@ -387,11 +350,17 @@ export function useRackView() {
       // 5. 执行全场景清理
       cleanupScene(scene);
       
-      // 6. 更新状态
+      // 6. 更新状态 - 全面重置所有状态
       rackViewState.isActive = false;
       rackViewState.selectedRack = null;
       rackViewState.sceneContainer = null;
       rackViewState.sceneOrigin = null;
+      rackViewState.firstNetworkElementClick = true; // 确保下次进入是第一次点击
+      rackViewState.isFrontView = false; // 重置视图方向状态
+      rackViewState.currentRack = null; // 重置当前机架引用
+      rackViewState.activeDevice = null; // 重置活动设备
+      rackViewState.activeDeviceParts = []; // 重置活动设备部件
+      rackViewState.deviceInteractionState = 0; // 重置设备交互阶段
       
       // 7. 更新组件状态
       if (sceneState) {
@@ -399,6 +368,7 @@ export function useRackView() {
         sceneState.singleRackScene = null;
         sceneState.singleRackContainer = null;
         sceneState.singleRackOrigin = null;
+        sceneState.isFrontView = false; // 同步重置组件状态中的视图方向
       }
       
       // 8. 强制重绘场景
@@ -414,10 +384,7 @@ export function useRackView() {
         });
       }
       
-      // 重置第一次点击标记
-      rackViewState.firstNetworkElementClick = true;
-      
-      console.log('单机架视图清理完成');
+      console.log('单机架视图清理完成，所有状态已重置');
       return true;
     } catch (error) {
       console.error('清理单机架视图时出错:', error);
@@ -482,44 +449,36 @@ export function useRackView() {
   // 单机架视图中的点击处理
   function handleSingleRackViewClick(data, context) {
     const {sceneState} = context;
-    // 检查是否为网元设备
-    const isNetworkElement = data.name && data.name.startsWith('NE_');
     
-    // 如果是网元设备
+    // 使用父级机架信息（如果有）
+    const effectiveData = data.userData?.parentRack || data;
+    
+    // 检查是否为第一次点击（任何对象）
+    if (rackViewState.firstNetworkElementClick) {
+      console.log('单机架视图中的第一次点击，切换到正面视图');
+      
+      // 无论当前视角如何，直接切换到正面视图
+      switchToFrontView(context);
+      
+      // 标记第一次点击已处理
+      rackViewState.firstNetworkElementClick = false;
+      
+      // 直接返回，不执行后续逻辑
+      return;
+    }
+    
+    // 非第一次点击，检查是否为网元设备
+    const isNetworkElement = effectiveData.name && effectiveData.name.startsWith('NE_');
+    
+    // 如果是网元设备，执行弹出动画
     if (isNetworkElement) {
-      console.log('单机架视图中点击网元设备:', data.name);
-      
-      // 如果当前是侧面视图，则先切换到正面视图
-      if (!rackViewState.isFrontView && !sceneState?.isFrontView) {
-        console.log('单机架视图中点击，切换到正面视图');
-        switchToFrontView(context);
-      }
-      
-      // 检查是否是第一次点击网元
-      if (rackViewState.firstNetworkElementClick) {
-        console.log('第一次点击网元，仅切换视图，不执行弹出动画');
-        rackViewState.firstNetworkElementClick = false; // 更新状态
-        return; // 直接返回，不执行弹出动画
-      } else {
-        // 非第一次点击，执行弹出动画
-        console.log('非第一次点击网元，执行弹出动画');
-        animateRackDevice(data.name, context);
-      }
-    } else if (data.type === 'rack') {
-      // 点击机架对象
-      console.log('单机架视图中点击机架:', data.name);
-      // 如果当前是侧面视图，则切换到正面视图
-      if (!rackViewState.isFrontView && !sceneState?.isFrontView) {
-        switchToFrontView(context);
-      }
-    } else {
-      // 如果点击的是其他非设备对象，不做特殊处理
-      console.log('单机架视图中点击非设备对象:', data.name);
-      // 如果当前是侧面视图，则切换到正面视图
-      if (!rackViewState.isFrontView && !sceneState?.isFrontView) {
-        console.log('单机架视图中点击，切换到正面视图');
-        switchToFrontView(context);
-      }
+      console.log('非第一次点击网元设备，执行弹出动画');
+      animateRackDevice(effectiveData.name, context);
+    } 
+    // 如果是点击其他类型对象，但视角不是正面，仍然切换到正面
+    else if (!rackViewState.isFrontView && !sceneState?.isFrontView) {
+      console.log('点击其他对象，切换到正面视图');
+      switchToFrontView(context);
     }
   }
 

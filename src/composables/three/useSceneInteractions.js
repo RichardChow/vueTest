@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ref, reactive, onMounted, onBeforeUnmount } from 'vue';
+import { useSceneObjects } from './useSceneObjects';
 
 /**
  * 场景交互管理Hook
@@ -45,6 +46,9 @@ export function useSceneInteractions(options = {}) {
   let camera = null;
   let scene = null;
   let pickableObjects = [];
+  
+  // 在 useSceneInteractions.js 中添加对 objectParentMap 的引用
+  const objectParentMap = ref(new Map());
   
   // 设置依赖项
   const setDependencies = ({ sceneRef, cameraRef, containerReference }) => {
@@ -198,27 +202,49 @@ export function useSceneInteractions(options = {}) {
     return raycaster.value.intersectObjects(pickableObjects, true);
   };
   
-  // 过滤相交结果
+  // 设置对象父级映射
+  const setObjectParentMap = (map) => {
+    if (map instanceof Map) {
+      objectParentMap.value = map;
+    }
+  };
+  
+  // 优化 filterIntersections 函数
   const filterIntersections = (intersections) => {
     if (!intersections || intersections.length === 0) return null;
     
-    // 查找第一个可交互的对象
-    for (const intersection of intersections) {
-      let currentObject = intersection.object;
+    // 获取第一个相交对象
+    const intersection = intersections[0];
+    const object = intersection.object;
+    
+    // 获取 useSceneObjects 中的方法
+    const { findInteractiveParentFast } = useSceneObjects();
+    
+    // 使用快速查找，如果有预处理的映射
+    if (objectParentMap.value.size > 0) {
+      const interactiveParent = findInteractiveParentFast(
+        object, 
+        objectParentMap.value
+      );
       
-      // 向上遍历对象层级寻找可交互对象
-      while (currentObject) {
-        if (currentObject.userData && currentObject.userData.isInteractive) {
-          return {
-            object: currentObject,
-            intersection: intersection
-          };
-        }
-        
-        // 继续向上查找
-        if (!currentObject.parent) break;
-        currentObject = currentObject.parent;
+      if (interactiveParent) {
+        return {
+          object: interactiveParent,
+          intersection: intersection
+        };
       }
+    }
+    
+    // 后备方案：使用传统的向上遍历查找
+    // 使用 findInteractiveParent 函数
+    const { findInteractiveParent } = useSceneObjects();
+    const result = findInteractiveParent(object);
+    
+    if (result && result.object) {
+      return {
+        object: result.object,
+        intersection: intersection
+      };
     }
     
     return null;
@@ -457,6 +483,9 @@ export function useSceneInteractions(options = {}) {
     
     // 内部方法 (可能需要在特定情况下直接调用)
     performRaycast,
-    updateMousePosition
+    updateMousePosition,
+    
+    // 新增方法
+    setObjectParentMap,
   };
 } 

@@ -39,31 +39,6 @@ export function useSceneObjects() {
     racks.value = [];
     devices.value = [];
   }
-  
-  /**
-   * 查找并缓存场景中的所有机架和设备
-   */
-  function findAllObjects() {
-    if (!sceneModel.value) return;
-    
-    // 找到所有的机架和设备
-    const foundRacks = [];
-    const foundDevices = [];
-    
-    sceneModel.value.traverse((obj) => {
-      if (obj.name && obj.name.toLowerCase().includes('rack')) {
-        foundRacks.push(obj);
-      } else if (isDevice(obj)) {
-        foundDevices.push(obj);
-      }
-    });
-    
-    // 更新缓存
-    racks.value = foundRacks;
-    devices.value = foundDevices;
-    
-    console.log(`找到 ${foundRacks.length} 个机架和 ${foundDevices.length} 个设备`);
-  }
 
   /**
    * 判断对象是否为设备
@@ -542,6 +517,116 @@ export function useSceneObjects() {
     }
   }
 
+  /**
+   * 查找对象的可交互父对象（适用于任何类型的对象）
+   * @param {THREE.Object3D} object - 初始对象
+   * @param {Object} options - 查找选项
+   * @returns {Object} 返回包含找到的对象和额外信息的结果
+   */
+  function findInteractiveParent(object, options = {}) {
+    if (!object) return null;
+    
+    const {
+      prioritizeNetworkElements = true, // 是否优先返回网元设备
+      maxDepth = 10, // 最大向上查找深度，防止无限循环
+      returnFirstInteractive = true // 是否返回找到的第一个可交互对象
+    } = options;
+    
+    let currentObject = object;
+    let depth = 0;
+    let foundInteractiveObject = null;
+    let foundNetworkElement = null;
+    
+    // 向上遍历对象层级
+    while (currentObject && depth < maxDepth) {
+      // 检查当前对象是否可交互
+      if (currentObject.userData && currentObject.userData.isInteractive) {
+        // 如果是第一个找到的可交互对象，记录它
+        if (!foundInteractiveObject) {
+          foundInteractiveObject = currentObject;
+          
+          // 如果不需要优先处理网元设备且返回第一个可交互对象，直接返回
+          if (!prioritizeNetworkElements && returnFirstInteractive) {
+            return {
+              object: foundInteractiveObject,
+              isNetworkElement: false,
+              depth: depth
+            };
+          }
+        }
+        
+        // 检查是否为网元设备
+        if (currentObject.name && currentObject.name.startsWith('NE_')) {
+          foundNetworkElement = currentObject;
+          
+          // 如果优先处理网元设备，找到后直接返回
+          if (prioritizeNetworkElements) {
+            return {
+              object: foundNetworkElement,
+              isNetworkElement: true,
+              depth: depth
+            };
+          }
+        }
+      }
+      
+      // 继续向上查找
+      if (!currentObject.parent) break;
+      currentObject = currentObject.parent;
+      depth++;
+    }
+    
+    // 返回找到的对象，优先返回网元设备
+    const resultObject = prioritizeNetworkElements ? 
+      (foundNetworkElement || foundInteractiveObject) : 
+      foundInteractiveObject;
+      
+    if (resultObject) {
+      return {
+        object: resultObject,
+        isNetworkElement: resultObject === foundNetworkElement,
+        depth: depth
+      };
+    }
+    
+    return null;
+  }
+
+  /**
+   * 使用预处理的映射快速查找可交互父对象
+   * @param {THREE.Object3D} object - 初始对象
+   * @param {Map} objectParentMap - 对象ID到父对象的映射
+   * @param {Set|Map} interactiveObjects - 可交互对象集合或映射
+   * @returns {THREE.Object3D} 找到的可交互父对象或null
+   */
+  function findInteractiveParentFast(object, objectParentMap, interactiveObjects) {
+    if (!object || !objectParentMap) return null;
+    
+    // 首先检查对象本身是否可交互
+    if (object.userData && object.userData.isInteractive) {
+      return object;
+    }
+    
+    // 使用映射快速查找父对象链
+    let currentId = object.id;
+    let maxDepth = 10; // 防止无限循环
+    let depth = 0;
+    
+    while (objectParentMap.has(currentId) && depth < maxDepth) {
+      const parent = objectParentMap.get(currentId);
+      
+      // 检查父对象是否可交互
+      if (parent.userData && parent.userData.isInteractive) {
+        return parent;
+      }
+      
+      currentId = parent.id;
+      depth++;
+    }
+    
+    return null;
+  }
+
   return {
     // 状态和引用
     state,
@@ -555,7 +640,6 @@ export function useSceneObjects() {
     
     // 对象管理方法
     setSceneModel,
-    findAllObjects,
     isDevice,
     
     // 查找方法
@@ -580,6 +664,10 @@ export function useSceneObjects() {
     // 视图管理
     setCurrentRack(rack) { currentRack.value = rack; },
     setCurrentDevice(device) { currentDevice.value = device; },
-    setCurrentSceneContainer(container) { currentSceneContainer.value = container; }
+    setCurrentSceneContainer(container) { currentSceneContainer.value = container; },
+    
+    // 新增方法
+    findInteractiveParent,
+    findInteractiveParentFast
   };
 } 

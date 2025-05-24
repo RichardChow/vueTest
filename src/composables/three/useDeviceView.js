@@ -14,7 +14,8 @@ export function useDeviceView() {
     animationState: {
       stage: 0, // 0=初始, 1=弹出, 2=展开
       isAnimating: false
-    }
+    },
+    originalMinDistance: null
   });
 
   /**
@@ -32,7 +33,9 @@ export function useDeviceView() {
       mainModel,
       getObjectByName,
       sceneState,
-      emitViewChanged
+      emitViewChanged,
+      setPickableObjects,
+      setObjectParentMap
     } = context;
     
     if (!scene || !mainModel) {
@@ -87,6 +90,10 @@ export function useDeviceView() {
       origin.name = "SingleDeviceOrigin";
       sceneContainer.add(origin);
       
+      // 在这里添加变量定义（在处理设备之前）
+      const interactiveObjects = [];
+      const parentMapping = new Map();
+      
       // 4. 克隆设备并添加到新场景
       const deviceClone = deviceObject.clone(true);
       deviceClone.position.set(0, 0, 0); // 重置位置到原点
@@ -124,6 +131,20 @@ export function useDeviceView() {
           // 禁用阴影
           child.castShadow = false;
           child.receiveShadow = false;
+          
+          // 添加到交互对象数组
+          interactiveObjects.push(child);
+          
+          // 记录父级映射关系
+          if (child.parent && child.parent !== deviceClone) {
+            parentMapping.set(child.id, child.parent);
+          }
+          
+          // 保存父级设备信息
+          child.userData.parentDevice = {
+            name: deviceData.name,
+            type: deviceData.type || 'NE'
+          };
         }
       });
       
@@ -155,18 +176,42 @@ export function useDeviceView() {
       // 计算适当的相机距离
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = camera.fov * (Math.PI / 180);
-      const cameraDistance = (maxDim / 2) / Math.tan(fov / 2) * 1.5;
+      let cameraDistance = (maxDim / 2) / Math.tan(fov / 2) * 1.5;
       
-      // 设置相机位置 - 稍微斜向上的视角
+      // 确保cameraDistance不是0或负数，如果模型非常小
+      if (cameraDistance <= 0) {
+          cameraDistance = 1; // 设置一个最小默认距离
+      }
+      
+      // 修改相机位置 - 从右前方45度角观察设备
       camera.position.set(
-        center.x + cameraDistance * 0.8,
-        center.y + cameraDistance * 0.5,
-        center.z + cameraDistance * 0.8
+        center.x - cameraDistance * 0.85,
+        center.y + maxDim * 0.1,
+        center.z + cameraDistance * 0.85
       );
       
-      // 设置相机目标
-      controls.target.set(center.x, center.y, center.z);
-      controls.update();
+      // 控制器目标点保持不变
+      controls.target.set(
+        center.x,
+        center.y,
+        center.z
+      );
+      
+      // 新增：调整OrbitControls的minDistance允许更近观察
+      if (controls) {
+        // 保存原始的minDistance，如果尚未保存
+        if (deviceViewState.originalMinDistance === null) {
+            deviceViewState.originalMinDistance = controls.minDistance;
+        }
+        // 允许相机靠近到模型尺寸的一小部分，例如模型最大维度的10%
+        // 或者一个较小的固定值，确保可以放大
+        controls.minDistance = Math.max(0.1, maxDim * 0.1); 
+        // 你也可以根据需要设置一个非常小的值，如 controls.minDistance = 0.01;
+        // 但要注意不要设置得太小以至于相机穿透模型
+        console.log(`单设备视图: controls.minDistance 设置为 ${controls.minDistance}`);
+      }
+      
+      controls.update(); // 应用相机和目标点的变化
       
       // 强制更新矩阵以确保准确的交互计算
       sceneContainer.updateWorldMatrix(true, true);
@@ -195,10 +240,24 @@ export function useDeviceView() {
         });
       }
       
+      // 设置可交互对象和父级映射
+      if (setPickableObjects) {
+        setPickableObjects(interactiveObjects);
+      }
+      
+      if (setObjectParentMap) {
+        setObjectParentMap(parentMapping);
+      }
+      
       console.log('单设备视图创建完成');
       return true;
     } catch (error) {
       console.error('创建单设备视图时出错:', error);
+      // 确保在出错时也尝试恢复controls的设置（如果已修改）
+      if (controls && deviceViewState.originalMinDistance !== null) {
+          controls.minDistance = deviceViewState.originalMinDistance;
+          deviceViewState.originalMinDistance = null; // 重置保存的值
+      }
       return false;
     }
   }
@@ -209,7 +268,7 @@ export function useDeviceView() {
    * @returns {Boolean} 是否成功销毁
    */
   function destroySingleDeviceScene(context) {
-    const { scene, sceneState, mainModel, emitViewChanged, renderer, camera } = context;
+    const { scene, sceneState, mainModel, emitViewChanged, renderer, camera, controls } = context;
     
     if (!deviceViewState.isActive) return false;
     
@@ -297,6 +356,13 @@ export function useDeviceView() {
           view: 'main',
           data: null
         });
+      }
+      
+      // 新增：恢复OrbitControls的原始minDistance
+      if (controls && deviceViewState.originalMinDistance !== null) {
+        controls.minDistance = deviceViewState.originalMinDistance;
+        console.log(`单设备视图销毁: controls.minDistance 恢复为 ${controls.minDistance}`);
+        deviceViewState.originalMinDistance = null; // 重置，以便下次正确保存
       }
       
       console.log('单设备视图清理完成');

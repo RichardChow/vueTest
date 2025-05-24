@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { markRaw, ref, onMounted, onBeforeUnmount, shallowRef } from 'vue';
 import { useSceneCore } from '@/composables/three/useSceneCore';
+import { useSceneInteractions } from '@/composables/three/useSceneInteractions';
 
 /**
  * BaseThreeScene 组件
@@ -62,6 +63,14 @@ export default {
       cleanup
     } = useSceneCore();
 
+    // 使用useSceneInteractions获取交互功能
+    const {
+      setDependencies,
+      initialize: initInteractions,
+      onObjectClick,
+      onObjectHover
+    } = useSceneInteractions();
+
     // 使用shallowRef而不是ref来引用Three.js对象
     const containerRef = ref(null);
     const model = shallowRef(null);
@@ -87,11 +96,15 @@ export default {
           directionalLightIntensity: props.directionalLightIntensity
         };
 
-        // 初始化Three.js场景
+    // 初始化Three.js场景
         initScene(containerRef.value, options);
 
-        // 设置交互
-        setupInteraction();
+        // 设置交互系统依赖
+        setDependencies({
+          sceneRef: scene.value,
+          cameraRef: camera.value,
+          containerReference: containerRef.value
+        });
 
         // 加载模型
         loadModel();
@@ -107,6 +120,36 @@ export default {
 
       // 监听窗口大小变化
       window.addEventListener('resize', onWindowResize);
+
+      // 注册事件转发
+      onObjectClick((object, eventData) => {
+        emit('object-clicked', {
+          name: object.name,
+          type: object.userData.type || 'unknown',
+          position: {
+            x: eventData.intersection.point.x,
+            y: eventData.intersection.point.y,
+            z: eventData.intersection.point.z
+          }
+        });
+      });
+      
+      onObjectHover({
+        onEnter: (object, eventData) => {
+          emit('object-hover', {
+            objectFound: true,
+            objectName: object.name,
+            objectType: object.userData.type || 'unknown',
+            x: eventData.position.clientX,
+            y: eventData.position.clientY
+          });
+        },
+        onLeave: () => {
+          emit('object-hover', {
+            objectFound: false
+          });
+        }
+      });
     });
 
     // 资源清理
@@ -121,11 +164,6 @@ export default {
       // 移除事件监听器
       window.removeEventListener('resize', onWindowResize);
       
-      if (containerRef.value) {
-        containerRef.value.removeEventListener('click', onMouseClick);
-        containerRef.value.removeEventListener('mousemove', onMouseMove);
-      }
-      
       // 清理所有资源
       cleanup();
     });
@@ -138,10 +176,10 @@ export default {
         isLoading.value = false;
         return;
       }
-
+      
       // 使用GLTFLoader加载模型
       const loader = markRaw(new GLTFLoader());
-
+      
       loader.load(
         props.modelPath,
         (gltf) => {
@@ -150,10 +188,10 @@ export default {
             console.warn('组件已被销毁，取消模型加载处理');
             return;
           }
-
+          
           // 使用markRaw处理gltf.scene
           model.value = markRaw(gltf.scene);
-
+          
           // 检查scene是否存在再添加模型
           if (scene.value) {
             scene.value.add(model.value);
@@ -162,17 +200,17 @@ export default {
             loadingError.value = '场景对象不存在，无法添加模型';
             return;
           }
-
+          
           // 处理模型
           processModel();
-
+          
           // 模型加载完成
           isLoading.value = false;
           loadingProgress.value = 100;
-
+          
           // 重置相机位置以适应模型
           resetCameraToFitModel(model.value);
-
+          
           // 通知父组件
           emit('model-loaded', {
             modelName: props.modelPath.split('/').pop(),
@@ -198,240 +236,23 @@ export default {
         console.error('无法处理模型：模型为空');
         return;
       }
-
-      console.log('处理模型:', props.modelPath);
-
-      // 添加调试日志，查看模型的层次结构
-      logModelStructure(model.value);
-
-      // 设置所有对象为可见
-      model.value.traverse((child) => {
-        if (child.isMesh || child.isGroup) {
-          child.visible = true;
-
-          // 如果是Mesh，确保材质正确
-          if (child.isMesh && !child.material) {
-            console.warn('Mesh缺少材质:', child.name);
-            // 添加默认材质
-            child.material = new THREE.MeshStandardMaterial({ color: 0x888888 });
-          }
-        }
-      });
-
-      // 检查命名的对象并输出信息
-      let meshCount = 0;
-      let interactiveObjectsCount = 0;
-
-      model.value.traverse((child) => {
-        if (child.isMesh) {
-          meshCount++;
-
-          if (child.name) {
-            console.log(`Mesh对象: ${child.name}, 位置: ${JSON.stringify(child.position)}, 可见性: ${child.visible}`);
-
-            // 标记特定对象为可交互
-            if (child.name.toLowerCase().includes('rack') || child.name.startsWith('NE_')) {
-              child.userData.isInteractive = true;
-              interactiveObjectsCount++;
-            }
-          }
-        }
-      });
-
-      console.log(`模型包含 ${meshCount} 个Mesh对象，其中 ${interactiveObjectsCount} 个标记为可交互`);
-    }
-
-    // 递归打印模型结构
-    function logModelStructure(object, indent = 0) {
-      const spaces = ' '.repeat(indent * 2);
-      let objType = 'Object';
-
-      if (object.isMesh) objType = 'Mesh';
-      else if (object.isGroup) objType = 'Group';
-      else if (object.isLight) objType = 'Light';
-
-      console.log(`${spaces}${objType}: ${object.name || '未命名'} (子对象: ${object.children.length})`);
-
-      // 递归打印子对象
-      if (object.children && object.children.length > 0 && indent < 3) { // 限制递归深度
-        object.children.forEach(child => {
-          logModelStructure(child, indent + 1);
-        });
-      }
-    }
-
-    // 设置交互
-    function setupInteraction() {
-      // 创建射线发射器和鼠标向量
-      raycaster.value = markRaw(new THREE.Raycaster());
-      mouse.value = markRaw(new THREE.Vector2());
-
-      // 添加点击事件监听器
-      if (containerRef.value) {
-        containerRef.value.addEventListener('click', onMouseClick);
-        containerRef.value.addEventListener('mousemove', onMouseMove);
-      }
-    }
-
-    // 鼠标点击处理
-    function onMouseClick(event) {
-      // 计算鼠标在归一化设备坐标中的位置
-      if (!containerRef.value) return;
       
-      const rect = containerRef.value.getBoundingClientRect();
-
-      mouse.value.x = ((event.clientX - rect.left) / containerRef.value.clientWidth) * 2 - 1;
-      mouse.value.y = -((event.clientY - rect.top) / containerRef.value.clientHeight) * 2 + 1;
-
-      // 更新射线发射器
-      raycaster.value.setFromCamera(mouse.value, camera.value);
-
-      // 使用markRaw处理intersects
-      const intersects = markRaw(raycaster.value.intersectObjects(scene.value.children, true));
-
-      if (intersects.length > 0) {
-        // 获取第一个相交的对象
-        let selectedObject = intersects[0].object;
-        let foundInteractiveObject = null;
-        let foundParentNetworkElement = null;
-
-        console.log('基础场景: 点击原始相交对象:', selectedObject.name);
-
-        // 向上遍历对象层级查找可交互对象
-        while (selectedObject) {
-          // 如果对象有交互属性
-          if (selectedObject.name && selectedObject.userData && selectedObject.userData.isInteractive) {
-            if (!foundInteractiveObject) {
-              foundInteractiveObject = selectedObject;
-              console.log(`基础场景: 点击找到可交互对象 ${foundInteractiveObject.name}`);
-            }
-
-            // 如果当前对象是网元设备，优先使用它
-            if (selectedObject.name.startsWith('NE_')) {
-              foundParentNetworkElement = selectedObject;
-              console.log(`基础场景: 点击找到父级网元设备 ${foundParentNetworkElement.name}`);
-              break; // 找到网元设备后停止遍历
-            }
-          }
-
-          // 继续向上遍历，除非已到达顶层
-          if (!selectedObject.parent) {
-            console.log('基础场景: 点击到达顶层，未找到网元设备父级');
-            break;
-          }
-          selectedObject = selectedObject.parent;
-        }
-
-        // 优先使用网元设备，否则使用找到的第一个可交互对象
-        const finalObject = foundParentNetworkElement || foundInteractiveObject;
-
-        // 如果找到了最终对象
-        if (finalObject) {
-          // 执行点击处理
-          handleObjectClick(finalObject, intersects[0].point);
-        }
-      }
-    }
-
-    // 对象点击处理
-    function handleObjectClick(object, intersectionPoint) {
-      // 基础点击处理，发送事件到父组件
-      emit('object-clicked', {
-        name: object.name,
-        type: object.userData.type || 'unknown',
-        position: {
-          x: intersectionPoint.x,
-          y: intersectionPoint.y,
-          z: intersectionPoint.z
-        }
-      });
-    }
-
-    // 鼠标移动处理
-    function onMouseMove(event) {
-      if (!containerRef.value) return;
+      console.log('处理模型基础属性:', props.modelPath);
       
-      // 计算鼠标在归一化设备坐标中的位置
-      const rect = containerRef.value.getBoundingClientRect();
-
-      mouse.value.x = ((event.clientX - rect.left) / containerRef.value.clientWidth) * 2 - 1;
-      mouse.value.y = -((event.clientY - rect.top) / containerRef.value.clientHeight) * 2 + 1;
-
-      // 更新射线发射器
-      raycaster.value.setFromCamera(mouse.value, camera.value);
-
-      // 计算与射线相交的对象
-      const intersects = markRaw(raycaster.value.intersectObjects(scene.value.children, true));
-
-      // 重置之前高亮的对象
-      if (currentHoveredObject.value) {
-        resetHighlight(currentHoveredObject.value);
-        currentHoveredObject.value = null;
-      }
-
-      let foundInteractiveObject = null;
-      let foundParentNetworkElement = null;
-
-      if (intersects.length > 0) {
-        let currentObject = intersects[0].object;
-
-        // 向上遍历查找第一个标记为可交互的对象
-        while (currentObject) {
-          // 标记可交互的对象
-          if (currentObject.userData && currentObject.userData.isInteractive) {
-            if (!foundInteractiveObject) {
-              foundInteractiveObject = currentObject;
-            }
-
-            // 如果当前对象是网元设备（名称以NE_开头），优先使用它
-            if (currentObject.name && currentObject.name.startsWith('NE_')) {
-              foundParentNetworkElement = currentObject;
-              break; // 找到网元设备后停止遍历
-            }
-          }
-
-          // 继续向上遍历
-          if (!currentObject.parent) {
-            break;
-          }
-          currentObject = currentObject.parent;
-        }
-      }
-
-      // 优先使用网元设备，如果没有则使用找到的第一个可交互对象
-      const finalObject = foundParentNetworkElement || foundInteractiveObject;
-
-      // 如果找到了最终对象
-      if (finalObject) {
-        highlightObject(finalObject); // 高亮
-        currentHoveredObject.value = markRaw(finalObject); // 设置当前悬停对象
-
-        // 发送鼠标悬停位置事件，包含对象信息
-        emit('object-hover', {
-          x: event.clientX,
-          y: event.clientY,
-          objectFound: true,
-          objectName: finalObject.name,
-          objectType: finalObject.userData.type || 'unknown'
-        });
-      } else {
-        // 未找到可交互对象，只发送鼠标位置
-        emit('object-hover', {
-          x: event.clientX,
-          y: event.clientY,
-          objectFound: false
-        });
-      }
-    }
-
-    // 对象高亮
-    function highlightObject() {
-      // 子类可以重写此方法进行特定的高亮处理
-    }
-
-    // 重置高亮
-    function resetHighlight() {
-      // 子类可以重写此方法进行特定的高亮重置处理
+      // 只进行基础处理：设置交互性和可拾取性
+      model.value.traverse((object) => {
+        // 设置每个对象的userData
+        if (!object.userData) object.userData = {};
+        
+        // 标记模型对象，以便后续处理
+        object.userData.isModelPart = true;
+      });
+      
+      // 触发事件，不传递处理结果
+      // emit('model-loaded', {
+        // modelName: props.modelPath.split('/').pop(),
+        // modelObject: model.value
+      // });
     }
 
     // 获取悬停对象
@@ -463,8 +284,6 @@ export default {
       loadModel,
       processModel,
       getHoveredObject,
-      highlightObject,
-      resetHighlight,
       
       // 内部使用的方法不需要返回
     };
