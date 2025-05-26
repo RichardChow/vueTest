@@ -70,7 +70,7 @@
       </template>
       
       <template #default>
-        <div class="device-details" v-if="selectedDevice">
+        <div class="device-details" v-if="selectedDevice && deviceData">
           <div class="device-name">{{ deviceData.static.displayName || formatDeviceName(deviceData.static.name) }}</div>
           <div class="device-type">{{ getDeviceTypeLabel(deviceData.static.type) }}</div>
           
@@ -115,11 +115,11 @@
               <button 
                 class="btn-refresh" 
                 @click="refreshDynamicData"
-                :disabled="loading.updating"
-                :class="{ spinning: loading.updating }"
+                :disabled="loading?.updating"
+                :class="{ spinning: loading?.updating }"
               >
                 <i class="icon-refresh"></i>
-                {{ loading.updating ? '更新中...' : '获取当前信息' }}
+                {{ loading?.updating ? '更新中...' : '获取当前信息' }}
               </button>
             </div>
             
@@ -296,8 +296,8 @@ export default {
       clearData,
       formatUptime,
       formatBytes,
-      formatPercentage: formatPercentageFromComposable,
-      formatTemperature: formatTemperatureFromComposable
+      formatPercentage,
+      formatTemperature
     } = useDeviceData();
 
     // 设备详情面板相关
@@ -447,15 +447,22 @@ export default {
         // 设置选中设备
         selectedDevice.value = deviceData;
         
-        // 加载设备数据
+        // 先重置/初始化数据结构
+        clearData(); 
+        
+        // 确保面板可见性在数据加载前设置
+        deviceDetailPanelVisible.value = true;
+        
+        // 然后加载数据
         await loadDeviceData(deviceData.name);
         
-        // 显示设备详情面板
-        deviceDetailPanelVisible.value = true;
         console.log('设备详情面板已显示:', deviceData.name);
-        
       } catch (err) {
         console.error('处理设备点击失败:', err);
+        error.value = `加载设备数据失败: ${err.message}`;
+        
+        // 生成备用数据确保UI不崩溃
+        generateMockDeviceData(deviceData.name);
       }
     };
 
@@ -804,9 +811,11 @@ export default {
       clearData,
       formatUptime,
       formatBytes,
-      formatPercentageFromComposable,
-      formatTemperatureFromComposable,
-      openSSHTerminal
+      openSSHTerminal,
+      deviceData,
+      loading,
+      error,
+      isOnline
     };
   }
 };
