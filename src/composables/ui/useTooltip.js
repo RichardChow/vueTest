@@ -22,18 +22,14 @@ export function useTooltip(options = {}) {
   // 提示状态
   const tooltip = reactive({
     visible: false,
-    x: 0,
-    y: 0,
     title: '',
     content: '',
-    type: config.defaultType, // 'default', 'info', 'warning', 'error', 'success'
-    targetId: null,
-    sticky: false,       // 是否保持显示
-    autoAdjust: true,    // 是否自动调整位置避免超出屏幕
-    htmlContent: false,  // 内容是否包含HTML
-    data: null,          // 自定义数据对象
-    maxWidth: null,      // 最大宽度
-    placement: 'auto'    // 'auto', 'top', 'right', 'bottom', 'left'
+    htmlContent: false,
+    x: 0,
+    y: 0,
+    type: 'info',
+    showRightClickTip: false,
+    rightClickTipText: '右键点击查看更多选项'
   });
 
   // 内部状态
@@ -172,6 +168,17 @@ export function useTooltip(options = {}) {
     tooltip.visible = false;
   };
 
+  // 在useTooltip.js中添加updateTooltip函数
+  const updateTooltip = (options) => {
+    if (options.x !== undefined) tooltip.x = options.x + config.offsetX;
+    if (options.y !== undefined) tooltip.y = options.y + config.offsetY;
+    if (options.title !== undefined) tooltip.title = options.title;
+    if (options.content !== undefined) tooltip.content = options.content;
+    if (options.type !== undefined) tooltip.type = options.type;
+    if (options.showRightClickTip !== undefined) tooltip.showRightClickTip = options.showRightClickTip;
+    if (options.rightClickTipText !== undefined) tooltip.rightClickTipText = options.rightClickTipText;
+  };
+
   return {
     tooltip,
     tooltipStyle,
@@ -179,6 +186,7 @@ export function useTooltip(options = {}) {
     hideTooltip,
     hideTooltipImmediately,
     updatePosition,
+    updateTooltip,
     eventHandlers,
     cleanup
   };

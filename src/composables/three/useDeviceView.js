@@ -2,6 +2,7 @@
 
 import * as THREE from 'three';
 import { reactive } from 'vue';
+import { getRackOrientation } from '@/utils/layoutUtils';
 
 export function useDeviceView() {
   // 维护设备视图状态
@@ -183,12 +184,52 @@ export function useDeviceView() {
           cameraDistance = 1; // 设置一个最小默认距离
       }
       
-      // 修改相机位置 - 从右前方45度角观察设备
-      camera.position.set(
-        center.x - cameraDistance * 0.85,
-        center.y + maxDim * 0.1,
-        center.z + cameraDistance * 0.85
-      );
+      // 获取设备所属机架的朝向信息
+      let deviceOrientation = null;
+      if (deviceObject.userData && deviceObject.userData.details && deviceObject.userData.details.rack) {
+          const rackName = deviceObject.userData.details.rack;
+          // 使用layoutUtils中的方法获取机架朝向
+          if (context.layoutMarkers && context.layoutMarkers.size > 0) {
+              deviceOrientation = getRackOrientation(rackName, context.layoutMarkers);
+          }
+      }
+      
+      // 修改相机位置 - 根据朝向设置观察角度
+      if (deviceOrientation && deviceOrientation.direction) {
+          // 根据朝向决定相机位置
+          switch (deviceOrientation.direction) {
+              case 'east':
+                  // 东向(右侧)机架的设备需要从左前方观察
+                  camera.position.set(
+                      center.x - cameraDistance * 0.85,
+                      center.y + maxDim * 0.1,
+                      center.z + cameraDistance * 0.85
+                  );
+                  break;
+              case 'west':
+                  // 西向(左侧)机架的设备需要从右前方观察
+                  camera.position.set(
+                      center.x + cameraDistance * 0.85,
+                      center.y + maxDim * 0.1,
+                      center.z + cameraDistance * 0.85
+                  );
+                  break;
+              default:
+                  // 默认从左前方45度角观察设备（与机架视图保持一致）
+                  camera.position.set(
+                      center.x - cameraDistance * 0.85,
+                      center.y + maxDim * 0.1,
+                      center.z + cameraDistance * 0.85
+                  );
+          }
+      } else {
+          // 无法确定朝向时使用默认左前方45度角观察
+          camera.position.set(
+              center.x - cameraDistance * 0.85,
+              center.y + maxDim * 0.1,
+              center.z + cameraDistance * 0.85
+          );
+      }
       
       // 控制器目标点保持不变
       controls.target.set(

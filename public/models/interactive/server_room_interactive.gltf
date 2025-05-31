@@ -500,6 +500,12 @@
 		{
 			"mesh":31,
 			"name":"PowerModule_3_1_east",
+			"rotation":[
+				0,
+				-1,
+				0,
+				4.371138828673793e-08
+			],
 			"translation":[
 				-1.100000023841858,
 				0,
@@ -1140,7 +1146,7 @@
 	"materials":[
 		{
 			"doubleSided":true,
-			"name":"FloorMaterial.010",
+			"name":"FloorMaterial.003",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.800000011920929,
@@ -1155,7 +1161,7 @@
 		{
 			"alphaMode":"BLEND",
 			"doubleSided":true,
-			"name":"LayoutMarker1Material.009",
+			"name":"LayoutMarker1Material.003",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -1169,7 +1175,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"FloorTextMaterial.036",
+			"name":"FloorTextMaterial.009",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8999999761581421,
@@ -1184,7 +1190,7 @@
 		{
 			"alphaMode":"BLEND",
 			"doubleSided":true,
-			"name":"LayoutMarker2Material.009",
+			"name":"LayoutMarker2Material.003",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -1198,7 +1204,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"FloorTextMaterial.037",
+			"name":"FloorTextMaterial.010",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8999999761581421,
@@ -1213,7 +1219,7 @@
 		{
 			"alphaMode":"BLEND",
 			"doubleSided":true,
-			"name":"LayoutMarker3Material.009",
+			"name":"LayoutMarker3Material.003",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.6000000238418579,
@@ -1227,7 +1233,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"FloorTextMaterial.038",
+			"name":"FloorTextMaterial.011",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8999999761581421,
@@ -1242,7 +1248,7 @@
 		{
 			"alphaMode":"BLEND",
 			"doubleSided":true,
-			"name":"LayoutMarker4Material.009",
+			"name":"LayoutMarker4Material.003",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.800000011920929,
@@ -1256,7 +1262,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"FloorTextMaterial.039",
+			"name":"FloorTextMaterial.012",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8999999761581421,
@@ -1271,7 +1277,7 @@
 		{
 			"alphaMode":"BLEND",
 			"doubleSided":true,
-			"name":"WallMaterial.063",
+			"name":"WallMaterial.015",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8999999761581421,
@@ -1286,7 +1292,7 @@
 		{
 			"alphaMode":"BLEND",
 			"doubleSided":true,
-			"name":"WallMaterial.064",
+			"name":"WallMaterial.016",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8999999761581421,
@@ -1301,7 +1307,7 @@
 		{
 			"alphaMode":"BLEND",
 			"doubleSided":true,
-			"name":"WallMaterial.065",
+			"name":"WallMaterial.017",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8999999761581421,
@@ -1316,7 +1322,7 @@
 		{
 			"alphaMode":"BLEND",
 			"doubleSided":true,
-			"name":"WallMaterial.066",
+			"name":"WallMaterial.018",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8999999761581421,
@@ -1331,7 +1337,7 @@
 		{
 			"alphaMode":"BLEND",
 			"doubleSided":true,
-			"name":"WallMaterial.067",
+			"name":"WallMaterial.019",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8999999761581421,
@@ -1346,7 +1352,7 @@
 		{
 			"alphaMode":"BLEND",
 			"doubleSided":true,
-			"name":"WallMaterial.068",
+			"name":"WallMaterial.020",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8999999761581421,
@@ -1361,7 +1367,7 @@
 		{
 			"alphaMode":"BLEND",
 			"doubleSided":true,
-			"name":"WallMaterial.069",
+			"name":"WallMaterial.021",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8999999761581421,
@@ -1375,7 +1381,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"FireBoxMaterial.018",
+			"name":"FireBoxMaterial.005",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.800000011920929,
@@ -1389,7 +1395,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"FireBoxMaterial.019",
+			"name":"FireBoxMaterial.006",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.800000011920929,
@@ -1403,7 +1409,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_PowerModule.008",
+			"name":"Material_PowerModule.003",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -1417,7 +1423,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_Text.008",
+			"name":"Material_Text.003",
 			"pbrMetallicRoughness":{
 				"metallicFactor":0,
 				"roughnessFactor":0.5
@@ -1425,49 +1431,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.193",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.20000000298023224,
-					0.20000000298023224,
-					0.20000000298023224,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"CircleMaterial.193",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					1,
-					1,
-					0,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"NumberMaterial.193",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0,
-					0,
-					0,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"TriangleMaterial.385",
+			"name":"PlateMaterial.049",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -1481,35 +1445,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.386",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.20000000298023224,
-					0.20000000298023224,
-					0.20000000298023224,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"PlateMaterial.194",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.20000000298023224,
-					0.20000000298023224,
-					0.20000000298023224,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"CircleMaterial.194",
+			"name":"CircleMaterial.049",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -1523,7 +1459,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.194",
+			"name":"NumberMaterial.049",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -1537,7 +1473,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.387",
+			"name":"TriangleMaterial.097",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -1551,7 +1487,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.388",
+			"name":"TriangleMaterial.098",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -1565,7 +1501,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.195",
+			"name":"PlateMaterial.050",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -1579,77 +1515,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.195",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					1,
-					1,
-					0,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"NumberMaterial.195",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0,
-					0,
-					0,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"TriangleMaterial.389",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.20000000298023224,
-					0.20000000298023224,
-					0.20000000298023224,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"TriangleMaterial.390",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.20000000298023224,
-					0.20000000298023224,
-					0.20000000298023224,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"PlateMaterial.196",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.20000000298023224,
-					0.20000000298023224,
-					0.20000000298023224,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"CircleMaterial.196",
+			"name":"CircleMaterial.050",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -1663,7 +1529,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.196",
+			"name":"NumberMaterial.050",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -1677,7 +1543,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.391",
+			"name":"TriangleMaterial.099",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -1691,7 +1557,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.392",
+			"name":"TriangleMaterial.100",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -1705,7 +1571,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.197",
+			"name":"PlateMaterial.051",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -1719,77 +1585,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.197",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					1,
-					1,
-					0,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"NumberMaterial.197",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0,
-					0,
-					0,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"TriangleMaterial.393",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.20000000298023224,
-					0.20000000298023224,
-					0.20000000298023224,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"TriangleMaterial.394",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.20000000298023224,
-					0.20000000298023224,
-					0.20000000298023224,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"PlateMaterial.198",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.20000000298023224,
-					0.20000000298023224,
-					0.20000000298023224,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"CircleMaterial.198",
+			"name":"CircleMaterial.051",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -1803,7 +1599,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.198",
+			"name":"NumberMaterial.051",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -1817,7 +1613,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.395",
+			"name":"TriangleMaterial.101",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -1831,7 +1627,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.396",
+			"name":"TriangleMaterial.102",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -1845,7 +1641,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.199",
+			"name":"PlateMaterial.052",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -1859,77 +1655,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.199",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					1,
-					1,
-					0,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"NumberMaterial.199",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0,
-					0,
-					0,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"TriangleMaterial.397",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.20000000298023224,
-					0.20000000298023224,
-					0.20000000298023224,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"TriangleMaterial.398",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.20000000298023224,
-					0.20000000298023224,
-					0.20000000298023224,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"PlateMaterial.200",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.20000000298023224,
-					0.20000000298023224,
-					0.20000000298023224,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"CircleMaterial.200",
+			"name":"CircleMaterial.052",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -1943,7 +1669,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.200",
+			"name":"NumberMaterial.052",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -1957,7 +1683,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.399",
+			"name":"TriangleMaterial.103",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -1971,7 +1697,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.400",
+			"name":"TriangleMaterial.104",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -1985,7 +1711,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.201",
+			"name":"PlateMaterial.053",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -1999,77 +1725,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.201",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					1,
-					1,
-					0,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"NumberMaterial.201",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0,
-					0,
-					0,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"TriangleMaterial.401",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.20000000298023224,
-					0.20000000298023224,
-					0.20000000298023224,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"TriangleMaterial.402",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.20000000298023224,
-					0.20000000298023224,
-					0.20000000298023224,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"PlateMaterial.202",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.20000000298023224,
-					0.20000000298023224,
-					0.20000000298023224,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.5
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"CircleMaterial.202",
+			"name":"CircleMaterial.053",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -2083,7 +1739,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.202",
+			"name":"NumberMaterial.053",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -2097,7 +1753,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.403",
+			"name":"TriangleMaterial.105",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2111,7 +1767,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.404",
+			"name":"TriangleMaterial.106",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2125,7 +1781,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.203",
+			"name":"PlateMaterial.054",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2139,7 +1795,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.203",
+			"name":"CircleMaterial.054",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -2153,7 +1809,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.203",
+			"name":"NumberMaterial.054",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -2167,7 +1823,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.405",
+			"name":"TriangleMaterial.107",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2181,7 +1837,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.406",
+			"name":"TriangleMaterial.108",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2195,7 +1851,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.204",
+			"name":"PlateMaterial.055",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2209,7 +1865,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.204",
+			"name":"CircleMaterial.055",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -2223,7 +1879,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.204",
+			"name":"NumberMaterial.055",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -2237,7 +1893,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.407",
+			"name":"TriangleMaterial.109",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2251,7 +1907,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.408",
+			"name":"TriangleMaterial.110",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2265,7 +1921,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.205",
+			"name":"PlateMaterial.056",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2279,7 +1935,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.205",
+			"name":"CircleMaterial.056",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -2293,7 +1949,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.205",
+			"name":"NumberMaterial.056",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -2307,7 +1963,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.409",
+			"name":"TriangleMaterial.111",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2321,7 +1977,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.410",
+			"name":"TriangleMaterial.112",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2335,7 +1991,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.206",
+			"name":"PlateMaterial.057",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2349,7 +2005,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.206",
+			"name":"CircleMaterial.057",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -2363,7 +2019,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.206",
+			"name":"NumberMaterial.057",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -2377,7 +2033,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.411",
+			"name":"TriangleMaterial.113",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2391,7 +2047,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.412",
+			"name":"TriangleMaterial.114",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2405,7 +2061,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.207",
+			"name":"PlateMaterial.058",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2419,7 +2075,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.207",
+			"name":"CircleMaterial.058",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -2433,7 +2089,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.207",
+			"name":"NumberMaterial.058",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -2447,7 +2103,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.413",
+			"name":"TriangleMaterial.115",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2461,7 +2117,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.414",
+			"name":"TriangleMaterial.116",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2475,7 +2131,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.208",
+			"name":"PlateMaterial.059",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2489,7 +2145,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.208",
+			"name":"CircleMaterial.059",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -2503,7 +2159,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.208",
+			"name":"NumberMaterial.059",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -2517,7 +2173,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.415",
+			"name":"TriangleMaterial.117",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2531,7 +2187,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.416",
+			"name":"TriangleMaterial.118",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2545,7 +2201,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.209",
+			"name":"PlateMaterial.060",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2559,7 +2215,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.209",
+			"name":"CircleMaterial.060",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -2573,7 +2229,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.209",
+			"name":"NumberMaterial.060",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -2587,7 +2243,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.417",
+			"name":"TriangleMaterial.119",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2601,7 +2257,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.418",
+			"name":"TriangleMaterial.120",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2615,7 +2271,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.210",
+			"name":"PlateMaterial.061",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2629,7 +2285,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.210",
+			"name":"CircleMaterial.061",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -2643,7 +2299,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.210",
+			"name":"NumberMaterial.061",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -2657,7 +2313,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.419",
+			"name":"TriangleMaterial.121",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2671,7 +2327,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.420",
+			"name":"TriangleMaterial.122",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2685,7 +2341,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.211",
+			"name":"PlateMaterial.062",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2699,7 +2355,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.211",
+			"name":"CircleMaterial.062",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -2713,7 +2369,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.211",
+			"name":"NumberMaterial.062",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -2727,7 +2383,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.421",
+			"name":"TriangleMaterial.123",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2741,7 +2397,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.422",
+			"name":"TriangleMaterial.124",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2755,7 +2411,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.212",
+			"name":"PlateMaterial.063",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2769,7 +2425,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.212",
+			"name":"CircleMaterial.063",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -2783,7 +2439,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.212",
+			"name":"NumberMaterial.063",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -2797,7 +2453,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.423",
+			"name":"TriangleMaterial.125",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2811,7 +2467,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.424",
+			"name":"TriangleMaterial.126",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2825,7 +2481,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.213",
+			"name":"PlateMaterial.064",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2839,7 +2495,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.213",
+			"name":"CircleMaterial.064",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -2853,7 +2509,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.213",
+			"name":"NumberMaterial.064",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -2867,7 +2523,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.425",
+			"name":"TriangleMaterial.127",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2881,7 +2537,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.426",
+			"name":"TriangleMaterial.128",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2895,7 +2551,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.214",
+			"name":"PlateMaterial.065",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2909,7 +2565,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.214",
+			"name":"CircleMaterial.065",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -2923,7 +2579,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.214",
+			"name":"NumberMaterial.065",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -2937,7 +2593,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.427",
+			"name":"TriangleMaterial.129",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2951,7 +2607,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.428",
+			"name":"TriangleMaterial.130",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2965,7 +2621,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.215",
+			"name":"PlateMaterial.066",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -2979,7 +2635,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.215",
+			"name":"CircleMaterial.066",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -2993,7 +2649,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.215",
+			"name":"NumberMaterial.066",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -3007,7 +2663,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.429",
+			"name":"TriangleMaterial.131",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -3021,7 +2677,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.430",
+			"name":"TriangleMaterial.132",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -3035,7 +2691,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"PlateMaterial.216",
+			"name":"PlateMaterial.067",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -3049,7 +2705,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"CircleMaterial.216",
+			"name":"CircleMaterial.067",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					1,
@@ -3063,7 +2719,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"NumberMaterial.216",
+			"name":"NumberMaterial.067",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -3077,7 +2733,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.431",
+			"name":"TriangleMaterial.133",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -3091,7 +2747,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"TriangleMaterial.432",
+			"name":"TriangleMaterial.134",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.20000000298023224,
@@ -3105,7 +2761,357 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Body.059",
+			"name":"PlateMaterial.068",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.20000000298023224,
+					0.20000000298023224,
+					0.20000000298023224,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"CircleMaterial.068",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					1,
+					1,
+					0,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"NumberMaterial.068",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0,
+					0,
+					0,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"TriangleMaterial.135",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.20000000298023224,
+					0.20000000298023224,
+					0.20000000298023224,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"TriangleMaterial.136",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.20000000298023224,
+					0.20000000298023224,
+					0.20000000298023224,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"PlateMaterial.069",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.20000000298023224,
+					0.20000000298023224,
+					0.20000000298023224,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"CircleMaterial.069",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					1,
+					1,
+					0,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"NumberMaterial.069",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0,
+					0,
+					0,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"TriangleMaterial.137",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.20000000298023224,
+					0.20000000298023224,
+					0.20000000298023224,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"TriangleMaterial.138",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.20000000298023224,
+					0.20000000298023224,
+					0.20000000298023224,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"PlateMaterial.070",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.20000000298023224,
+					0.20000000298023224,
+					0.20000000298023224,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"CircleMaterial.070",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					1,
+					1,
+					0,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"NumberMaterial.070",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0,
+					0,
+					0,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"TriangleMaterial.139",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.20000000298023224,
+					0.20000000298023224,
+					0.20000000298023224,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"TriangleMaterial.140",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.20000000298023224,
+					0.20000000298023224,
+					0.20000000298023224,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"PlateMaterial.071",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.20000000298023224,
+					0.20000000298023224,
+					0.20000000298023224,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"CircleMaterial.071",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					1,
+					1,
+					0,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"NumberMaterial.071",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0,
+					0,
+					0,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"TriangleMaterial.141",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.20000000298023224,
+					0.20000000298023224,
+					0.20000000298023224,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"TriangleMaterial.142",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.20000000298023224,
+					0.20000000298023224,
+					0.20000000298023224,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"PlateMaterial.072",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.20000000298023224,
+					0.20000000298023224,
+					0.20000000298023224,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"CircleMaterial.072",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					1,
+					1,
+					0,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"NumberMaterial.072",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0,
+					0,
+					0,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"TriangleMaterial.143",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.20000000298023224,
+					0.20000000298023224,
+					0.20000000298023224,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"TriangleMaterial.144",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.20000000298023224,
+					0.20000000298023224,
+					0.20000000298023224,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
+			"name":"Material_NPT1022_Body.024",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3119,7 +3125,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Rail_1.059",
+			"name":"Material_NPT1022_Rail_1.024",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3133,7 +3139,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Rail_2.059",
+			"name":"Material_NPT1022_Rail_2.024",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3147,7 +3153,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1250_Body.024",
+			"name":"Material_NPT1250_Body.009",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3161,7 +3167,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1250_Rail_1.024",
+			"name":"Material_NPT1250_Rail_1.009",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3175,7 +3181,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1250_Rail_2.024",
+			"name":"Material_NPT1250_Rail_2.009",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3189,7 +3195,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1050_Body.016",
+			"name":"Material_NPT1050_Body.006",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3203,7 +3209,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1050_Rail_1.016",
+			"name":"Material_NPT1050_Rail_1.006",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3217,7 +3223,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1050_Rail_2.016",
+			"name":"Material_NPT1050_Rail_2.006",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3231,7 +3237,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Body.060",
+			"name":"Material_NPT1022_Body.025",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3245,7 +3251,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Rail_1.060",
+			"name":"Material_NPT1022_Rail_1.025",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3259,7 +3265,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Rail_2.060",
+			"name":"Material_NPT1022_Rail_2.025",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3273,7 +3279,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1300_Body.016",
+			"name":"Material_NPT1300_Body.006",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3287,7 +3293,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1300_Rail_1.016",
+			"name":"Material_NPT1300_Rail_1.006",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3301,7 +3307,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1300_Rail_2.016",
+			"name":"Material_NPT1300_Rail_2.006",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3315,7 +3321,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1200_Body.032",
+			"name":"Material_NPT1200_Body.012",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3329,7 +3335,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1200_Rail_1.032",
+			"name":"Material_NPT1200_Rail_1.012",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3343,7 +3349,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1200_Rail_2.032",
+			"name":"Material_NPT1200_Rail_2.012",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3357,7 +3363,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Body.048",
+			"name":"Material_NPT1800_Body.018",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3371,7 +3377,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Rail_1.048",
+			"name":"Material_NPT1800_Rail_1.018",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3385,7 +3391,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Rail_2.048",
+			"name":"Material_NPT1800_Rail_2.018",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3399,7 +3405,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Body.049",
+			"name":"Material_NPT1800_Body.019",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3413,7 +3419,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Rail_1.049",
+			"name":"Material_NPT1800_Rail_1.019",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3427,7 +3433,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Rail_2.049",
+			"name":"Material_NPT1800_Rail_2.019",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3441,7 +3447,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1250_Body.025",
+			"name":"Material_NPT1250_Body.010",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3455,7 +3461,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1250_Rail_1.025",
+			"name":"Material_NPT1250_Rail_1.010",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3469,7 +3475,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1250_Rail_2.025",
+			"name":"Material_NPT1250_Rail_2.010",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3483,7 +3489,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1100_Body.016",
+			"name":"Material_NPT1100_Body.006",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3497,7 +3503,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1100_Rail_1.016",
+			"name":"Material_NPT1100_Rail_1.006",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3511,7 +3517,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1100_Rail_2.016",
+			"name":"Material_NPT1100_Rail_2.006",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3525,7 +3531,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Body.061",
+			"name":"Material_NPT1022_Body.026",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3539,7 +3545,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Rail_1.061",
+			"name":"Material_NPT1022_Rail_1.026",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3553,7 +3559,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Rail_2.061",
+			"name":"Material_NPT1022_Rail_2.026",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3567,7 +3573,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1200_Body.033",
+			"name":"Material_NPT1200_Body.013",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3581,7 +3587,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1200_Rail_1.033",
+			"name":"Material_NPT1200_Rail_1.013",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3595,7 +3601,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1200_Rail_2.033",
+			"name":"Material_NPT1200_Rail_2.013",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3609,7 +3615,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1250_Body.026",
+			"name":"Material_NPT1250_Body.011",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3623,7 +3629,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1250_Rail_1.026",
+			"name":"Material_NPT1250_Rail_1.011",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3637,7 +3643,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1250_Rail_2.026",
+			"name":"Material_NPT1250_Rail_2.011",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3651,7 +3657,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Body.050",
+			"name":"Material_NPT1800_Body.020",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3665,7 +3671,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Rail_1.050",
+			"name":"Material_NPT1800_Rail_1.020",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3679,7 +3685,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Rail_2.050",
+			"name":"Material_NPT1800_Rail_2.020",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3693,7 +3699,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Body.051",
+			"name":"Material_NPT1800_Body.021",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3707,7 +3713,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Rail_1.051",
+			"name":"Material_NPT1800_Rail_1.021",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3721,7 +3727,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Rail_2.051",
+			"name":"Material_NPT1800_Rail_2.021",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3735,7 +3741,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_Monitor_Frame.008",
+			"name":"Material_Monitor_Frame.003",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.05000000074505806,
@@ -3749,7 +3755,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_Monitor_Stand.008",
+			"name":"Material_Monitor_Stand.003",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.05000000074505806,
@@ -3763,7 +3769,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_Monitor_Neck.008",
+			"name":"Material_Monitor_Neck.003",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.05000000074505806,
@@ -3777,7 +3783,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_Monitor_Screen.008",
+			"name":"Material_Monitor_Screen.003",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -3791,7 +3797,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_Dell_Logo.008",
+			"name":"Material_Dell_Logo.003",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8999999761581421,
@@ -3805,7 +3811,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_Tray_Body.008",
+			"name":"Material_Tray_Body.003",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.30000001192092896,
@@ -3819,7 +3825,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1200_Body.034",
+			"name":"Material_NPT1200_Body.014",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3833,7 +3839,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1200_Rail_1.034",
+			"name":"Material_NPT1200_Rail_1.014",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3847,7 +3853,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1200_Rail_2.034",
+			"name":"Material_NPT1200_Rail_2.014",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3861,7 +3867,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Body.062",
+			"name":"Material_NPT1022_Body.027",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3875,7 +3881,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Rail_1.062",
+			"name":"Material_NPT1022_Rail_1.027",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3889,7 +3895,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Rail_2.062",
+			"name":"Material_NPT1022_Rail_2.027",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3903,7 +3909,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Body.052",
+			"name":"Material_NPT1800_Body.022",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3917,7 +3923,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Rail_1.052",
+			"name":"Material_NPT1800_Rail_1.022",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3931,7 +3937,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Rail_2.052",
+			"name":"Material_NPT1800_Rail_2.022",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3945,7 +3951,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Body.063",
+			"name":"Material_NPT1022_Body.028",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -3959,7 +3965,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Rail_1.063",
+			"name":"Material_NPT1022_Rail_1.028",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3973,7 +3979,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Rail_2.063",
+			"name":"Material_NPT1022_Rail_2.028",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -3987,7 +3993,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1100_Body.017",
+			"name":"Material_NPT1100_Body.007",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -4001,7 +4007,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1100_Rail_1.017",
+			"name":"Material_NPT1100_Rail_1.007",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -4015,7 +4021,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1100_Rail_2.017",
+			"name":"Material_NPT1100_Rail_2.007",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -4029,7 +4035,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Body.064",
+			"name":"Material_NPT1022_Body.029",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -4043,7 +4049,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Rail_1.064",
+			"name":"Material_NPT1022_Rail_1.029",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -4057,7 +4063,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Rail_2.064",
+			"name":"Material_NPT1022_Rail_2.029",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -4071,7 +4077,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1050_Body.017",
+			"name":"Material_NPT1050_Body.007",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -4085,7 +4091,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1050_Rail_1.017",
+			"name":"Material_NPT1050_Rail_1.007",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -4099,7 +4105,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1050_Rail_2.017",
+			"name":"Material_NPT1050_Rail_2.007",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -4113,7 +4119,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Body.065",
+			"name":"Material_NPT1022_Body.030",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -4127,7 +4133,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Rail_1.065",
+			"name":"Material_NPT1022_Rail_1.030",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -4141,7 +4147,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Rail_2.065",
+			"name":"Material_NPT1022_Rail_2.030",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -4155,7 +4161,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1200_Body.035",
+			"name":"Material_NPT1200_Body.015",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -4169,7 +4175,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1200_Rail_1.035",
+			"name":"Material_NPT1200_Rail_1.015",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -4183,7 +4189,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1200_Rail_2.035",
+			"name":"Material_NPT1200_Rail_2.015",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -4197,7 +4203,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1300_Body.017",
+			"name":"Material_NPT1300_Body.007",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -4211,7 +4217,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1300_Rail_1.017",
+			"name":"Material_NPT1300_Rail_1.007",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -4225,7 +4231,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1300_Rail_2.017",
+			"name":"Material_NPT1300_Rail_2.007",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -4239,7 +4245,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Body.053",
+			"name":"Material_NPT1800_Body.023",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -4253,7 +4259,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Rail_1.053",
+			"name":"Material_NPT1800_Rail_1.023",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -4267,7 +4273,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1800_Rail_2.053",
+			"name":"Material_NPT1800_Rail_2.023",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -4281,7 +4287,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Body.066",
+			"name":"Material_NPT1022_Body.031",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.3100000023841858,
@@ -4295,7 +4301,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Rail_1.066",
+			"name":"Material_NPT1022_Rail_1.031",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -4309,7 +4315,7 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"Material_NPT1022_Rail_2.066",
+			"name":"Material_NPT1022_Rail_2.031",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0.8500000238418579,
@@ -4324,7 +4330,7 @@
 	],
 	"meshes":[
 		{
-			"name":"FloorMesh.010",
+			"name":"FloorMesh.003",
 			"primitives":[
 				{
 					"attributes":{
@@ -4337,7 +4343,7 @@
 			]
 		},
 		{
-			"name":"Cube.530",
+			"name":"Cube.166",
 			"primitives":[
 				{
 					"attributes":{
@@ -4351,7 +4357,7 @@
 			]
 		},
 		{
-			"name":"Text.032",
+			"name":"Text.012",
 			"primitives":[
 				{
 					"attributes":{
@@ -4365,7 +4371,7 @@
 			]
 		},
 		{
-			"name":"Cube.531",
+			"name":"Cube.167",
 			"primitives":[
 				{
 					"attributes":{
@@ -4379,7 +4385,7 @@
 			]
 		},
 		{
-			"name":"Text.033",
+			"name":"Text.013",
 			"primitives":[
 				{
 					"attributes":{
@@ -4393,7 +4399,7 @@
 			]
 		},
 		{
-			"name":"Cube.532",
+			"name":"Cube.168",
 			"primitives":[
 				{
 					"attributes":{
@@ -4407,7 +4413,7 @@
 			]
 		},
 		{
-			"name":"Text.034",
+			"name":"Text.014",
 			"primitives":[
 				{
 					"attributes":{
@@ -4421,7 +4427,7 @@
 			]
 		},
 		{
-			"name":"Cube.533",
+			"name":"Cube.169",
 			"primitives":[
 				{
 					"attributes":{
@@ -4435,7 +4441,7 @@
 			]
 		},
 		{
-			"name":"Text.035",
+			"name":"Text.015",
 			"primitives":[
 				{
 					"attributes":{
@@ -4449,7 +4455,7 @@
 			]
 		},
 		{
-			"name":"Cube.534",
+			"name":"Cube.170",
 			"primitives":[
 				{
 					"attributes":{
@@ -4463,7 +4469,7 @@
 			]
 		},
 		{
-			"name":"Cube.535",
+			"name":"Cube.171",
 			"primitives":[
 				{
 					"attributes":{
@@ -4477,7 +4483,7 @@
 			]
 		},
 		{
-			"name":"Cube.536",
+			"name":"Cube.172",
 			"primitives":[
 				{
 					"attributes":{
@@ -4491,7 +4497,7 @@
 			]
 		},
 		{
-			"name":"Cube.537",
+			"name":"Cube.173",
 			"primitives":[
 				{
 					"attributes":{
@@ -4505,7 +4511,7 @@
 			]
 		},
 		{
-			"name":"Cube.538",
+			"name":"Cube.174",
 			"primitives":[
 				{
 					"attributes":{
@@ -4519,7 +4525,7 @@
 			]
 		},
 		{
-			"name":"Cube.539",
+			"name":"Cube.175",
 			"primitives":[
 				{
 					"attributes":{
@@ -4533,7 +4539,7 @@
 			]
 		},
 		{
-			"name":"Cube.540",
+			"name":"Cube.176",
 			"primitives":[
 				{
 					"attributes":{
@@ -4547,7 +4553,7 @@
 			]
 		},
 		{
-			"name":"Cube.541",
+			"name":"Cube.177",
 			"primitives":[
 				{
 					"attributes":{
@@ -4561,7 +4567,7 @@
 			]
 		},
 		{
-			"name":"Cube.542",
+			"name":"Cube.178",
 			"primitives":[
 				{
 					"attributes":{
@@ -4575,7 +4581,7 @@
 			]
 		},
 		{
-			"name":"Cube.543",
+			"name":"Cube.179",
 			"primitives":[
 				{
 					"attributes":{
@@ -4598,7 +4604,7 @@
 			]
 		},
 		{
-			"name":"Cube.544",
+			"name":"Cube.180",
 			"primitives":[
 				{
 					"attributes":{
@@ -4621,7 +4627,7 @@
 			]
 		},
 		{
-			"name":"Cube.545",
+			"name":"Cube.181",
 			"primitives":[
 				{
 					"attributes":{
@@ -4671,7 +4677,7 @@
 			]
 		},
 		{
-			"name":"Cube.546",
+			"name":"Cube.182",
 			"primitives":[
 				{
 					"attributes":{
@@ -4721,7 +4727,7 @@
 			]
 		},
 		{
-			"name":"Cube.547",
+			"name":"Cube.183",
 			"primitives":[
 				{
 					"attributes":{
@@ -4771,7 +4777,7 @@
 			]
 		},
 		{
-			"name":"Cube.548",
+			"name":"Cube.184",
 			"primitives":[
 				{
 					"attributes":{
@@ -4821,7 +4827,7 @@
 			]
 		},
 		{
-			"name":"Cube.549",
+			"name":"Cube.185",
 			"primitives":[
 				{
 					"attributes":{
@@ -4871,7 +4877,7 @@
 			]
 		},
 		{
-			"name":"Cube.550",
+			"name":"Cube.186",
 			"primitives":[
 				{
 					"attributes":{
@@ -4921,7 +4927,7 @@
 			]
 		},
 		{
-			"name":"Cube.551",
+			"name":"Cube.187",
 			"primitives":[
 				{
 					"attributes":{
@@ -4971,7 +4977,7 @@
 			]
 		},
 		{
-			"name":"Cube.552",
+			"name":"Cube.188",
 			"primitives":[
 				{
 					"attributes":{
@@ -5021,7 +5027,7 @@
 			]
 		},
 		{
-			"name":"Cube.553",
+			"name":"Cube.189",
 			"primitives":[
 				{
 					"attributes":{
@@ -5071,7 +5077,7 @@
 			]
 		},
 		{
-			"name":"Cube.554",
+			"name":"Cube.190",
 			"primitives":[
 				{
 					"attributes":{
@@ -5121,7 +5127,7 @@
 			]
 		},
 		{
-			"name":"Cube.555",
+			"name":"Cube.191",
 			"primitives":[
 				{
 					"attributes":{
@@ -5171,7 +5177,7 @@
 			]
 		},
 		{
-			"name":"Cube.556",
+			"name":"Cube.192",
 			"primitives":[
 				{
 					"attributes":{
@@ -5194,7 +5200,7 @@
 			]
 		},
 		{
-			"name":"Cube.557",
+			"name":"Cube.193",
 			"primitives":[
 				{
 					"attributes":{
@@ -5244,7 +5250,7 @@
 			]
 		},
 		{
-			"name":"Cube.558",
+			"name":"Cube.194",
 			"primitives":[
 				{
 					"attributes":{
@@ -5294,7 +5300,7 @@
 			]
 		},
 		{
-			"name":"Cube.559",
+			"name":"Cube.195",
 			"primitives":[
 				{
 					"attributes":{
@@ -5344,7 +5350,7 @@
 			]
 		},
 		{
-			"name":"Cube.560",
+			"name":"Cube.196",
 			"primitives":[
 				{
 					"attributes":{
@@ -5394,7 +5400,7 @@
 			]
 		},
 		{
-			"name":"Cube.561",
+			"name":"Cube.197",
 			"primitives":[
 				{
 					"attributes":{
@@ -5444,7 +5450,7 @@
 			]
 		},
 		{
-			"name":"Cube.562",
+			"name":"Cube.198",
 			"primitives":[
 				{
 					"attributes":{
@@ -5494,7 +5500,7 @@
 			]
 		},
 		{
-			"name":"Cube.563",
+			"name":"Cube.199",
 			"primitives":[
 				{
 					"attributes":{
@@ -5544,7 +5550,7 @@
 			]
 		},
 		{
-			"name":"Cube.564",
+			"name":"Cube.200",
 			"primitives":[
 				{
 					"attributes":{
@@ -5594,7 +5600,7 @@
 			]
 		},
 		{
-			"name":"Cube.565",
+			"name":"Cube.201",
 			"primitives":[
 				{
 					"attributes":{
@@ -5644,7 +5650,7 @@
 			]
 		},
 		{
-			"name":"Cube.566",
+			"name":"Cube.202",
 			"primitives":[
 				{
 					"attributes":{
@@ -5694,7 +5700,7 @@
 			]
 		},
 		{
-			"name":"Cube.567",
+			"name":"Cube.203",
 			"primitives":[
 				{
 					"attributes":{
@@ -5744,7 +5750,7 @@
 			]
 		},
 		{
-			"name":"Cube.568",
+			"name":"Cube.204",
 			"primitives":[
 				{
 					"attributes":{
@@ -5794,7 +5800,7 @@
 			]
 		},
 		{
-			"name":"Cube.569",
+			"name":"Cube.205",
 			"primitives":[
 				{
 					"attributes":{
@@ -5844,7 +5850,7 @@
 			]
 		},
 		{
-			"name":"Cube.570",
+			"name":"Cube.206",
 			"primitives":[
 				{
 					"attributes":{
@@ -5876,7 +5882,7 @@
 			]
 		},
 		{
-			"name":"Cube.571",
+			"name":"Cube.207",
 			"primitives":[
 				{
 					"attributes":{
@@ -5908,7 +5914,7 @@
 			]
 		},
 		{
-			"name":"Cube.572",
+			"name":"Cube.208",
 			"primitives":[
 				{
 					"attributes":{
@@ -5940,7 +5946,7 @@
 			]
 		},
 		{
-			"name":"Cube.573",
+			"name":"Cube.209",
 			"primitives":[
 				{
 					"attributes":{
@@ -5972,7 +5978,7 @@
 			]
 		},
 		{
-			"name":"Cube.574",
+			"name":"Cube.210",
 			"primitives":[
 				{
 					"attributes":{
@@ -6004,7 +6010,7 @@
 			]
 		},
 		{
-			"name":"Cube.575",
+			"name":"Cube.211",
 			"primitives":[
 				{
 					"attributes":{
@@ -6036,7 +6042,7 @@
 			]
 		},
 		{
-			"name":"Cube.576",
+			"name":"Cube.212",
 			"primitives":[
 				{
 					"attributes":{
@@ -6068,7 +6074,7 @@
 			]
 		},
 		{
-			"name":"Cube.577",
+			"name":"Cube.213",
 			"primitives":[
 				{
 					"attributes":{
@@ -6100,7 +6106,7 @@
 			]
 		},
 		{
-			"name":"Cube.578",
+			"name":"Cube.214",
 			"primitives":[
 				{
 					"attributes":{
@@ -6132,7 +6138,7 @@
 			]
 		},
 		{
-			"name":"Cube.579",
+			"name":"Cube.215",
 			"primitives":[
 				{
 					"attributes":{
@@ -6164,7 +6170,7 @@
 			]
 		},
 		{
-			"name":"Cube.580",
+			"name":"Cube.216",
 			"primitives":[
 				{
 					"attributes":{
@@ -6196,7 +6202,7 @@
 			]
 		},
 		{
-			"name":"Cube.581",
+			"name":"Cube.217",
 			"primitives":[
 				{
 					"attributes":{
@@ -6228,7 +6234,7 @@
 			]
 		},
 		{
-			"name":"Cube.582",
+			"name":"Cube.218",
 			"primitives":[
 				{
 					"attributes":{
@@ -6260,7 +6266,7 @@
 			]
 		},
 		{
-			"name":"Cube.583",
+			"name":"Cube.219",
 			"primitives":[
 				{
 					"attributes":{
@@ -6292,7 +6298,7 @@
 			]
 		},
 		{
-			"name":"Cube.584",
+			"name":"Cube.220",
 			"primitives":[
 				{
 					"attributes":{
@@ -6324,7 +6330,7 @@
 			]
 		},
 		{
-			"name":"Cube.585",
+			"name":"Cube.221",
 			"primitives":[
 				{
 					"attributes":{
@@ -6374,7 +6380,7 @@
 			]
 		},
 		{
-			"name":"Cube.586",
+			"name":"Cube.223",
 			"primitives":[
 				{
 					"attributes":{
@@ -6388,7 +6394,7 @@
 			]
 		},
 		{
-			"name":"Cube.587",
+			"name":"Cube.224",
 			"primitives":[
 				{
 					"attributes":{
@@ -6420,7 +6426,7 @@
 			]
 		},
 		{
-			"name":"Cube.588",
+			"name":"Cube.225",
 			"primitives":[
 				{
 					"attributes":{
@@ -6452,7 +6458,7 @@
 			]
 		},
 		{
-			"name":"Cube.589",
+			"name":"Cube.227",
 			"primitives":[
 				{
 					"attributes":{
@@ -6484,7 +6490,7 @@
 			]
 		},
 		{
-			"name":"Cube.590",
+			"name":"Cube.228",
 			"primitives":[
 				{
 					"attributes":{
@@ -6516,7 +6522,7 @@
 			]
 		},
 		{
-			"name":"Cube.591",
+			"name":"Cube.229",
 			"primitives":[
 				{
 					"attributes":{
@@ -6548,7 +6554,7 @@
 			]
 		},
 		{
-			"name":"Cube.592",
+			"name":"Cube.230",
 			"primitives":[
 				{
 					"attributes":{
@@ -6580,7 +6586,7 @@
 			]
 		},
 		{
-			"name":"Cube.593",
+			"name":"Cube.231",
 			"primitives":[
 				{
 					"attributes":{
@@ -6612,7 +6618,7 @@
 			]
 		},
 		{
-			"name":"Cube.594",
+			"name":"Cube.232",
 			"primitives":[
 				{
 					"attributes":{
@@ -6644,7 +6650,7 @@
 			]
 		},
 		{
-			"name":"Cube.595",
+			"name":"Cube.233",
 			"primitives":[
 				{
 					"attributes":{
@@ -6676,7 +6682,7 @@
 			]
 		},
 		{
-			"name":"Cube.596",
+			"name":"Cube.234",
 			"primitives":[
 				{
 					"attributes":{
@@ -6708,7 +6714,7 @@
 			]
 		},
 		{
-			"name":"Cube.597",
+			"name":"Cube.235",
 			"primitives":[
 				{
 					"attributes":{
@@ -6740,7 +6746,7 @@
 			]
 		},
 		{
-			"name":"Cube.598",
+			"name":"Cube.236",
 			"primitives":[
 				{
 					"attributes":{
@@ -17909,7 +17915,7 @@
 	"buffers":[
 		{
 			"byteLength":40042952,
-			"uri":"server_room_complete.bin"
+			"uri":"server_room_interactive.bin"
 		}
 	]
 }

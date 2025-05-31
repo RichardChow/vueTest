@@ -1,8 +1,9 @@
 // src/composables/three/useRackView.js
 import * as THREE from 'three';
-import { reactive } from 'vue';
+import { reactive, ref } from 'vue';
 import { animate, easeInOutCubic, easeOutCubic } from '@/utils/animations';
 import { useSceneObjects } from '@/composables/three/useSceneObjects';
+import { findLayoutMarkers, getRackOrientation } from '@/utils/layoutUtils';
 
 
 export function useRackView() {
@@ -17,11 +18,49 @@ export function useRackView() {
     activeDevice: null,
     activeDeviceParts: [],
     deviceInteractionState: 0,
-    firstNetworkElementClick: true
+    firstNetworkElementClick: true,
+    layoutMarkers: new Map() // 存储布局标记
   });
 
   const { findDeviceByName } = useSceneObjects();
+
+  /**
+   * 初始化布局标记
+   * @param {THREE.Object3D} model - 场景模型
+   */
+  function initLayoutMarkers(model) {
+    if (!model) return;
+    
+    // 查找并存储所有布局标记
+    rackViewState.layoutMarkers = findLayoutMarkers(model);
+    console.log(`找到 ${rackViewState.layoutMarkers.size} 个布局标记`);
+  }
   
+  /**
+   * 获取机架的初始旋转角度
+   * @param {string} rackName - 机架名称
+   * @returns {number} 旋转角度（弧度）
+   */
+  function getRackInitialRotation(rackName) {
+    const orientationInfo = getRackOrientation(rackName, rackViewState.layoutMarkers);
+    
+    // 根据方向确定基础角度
+    let baseAngle = 0;
+    switch (orientationInfo.direction) {
+      case 'north': baseAngle = Math.PI; break; // 朝北 = 180度
+      case 'east': baseAngle = Math.PI / 2; break; // 朝东 = 90度
+      case 'west': baseAngle = -Math.PI / 2; break; // 朝西 = -90度
+      default: baseAngle = 0; // 朝南 = 0度
+    }
+    
+    // 如果是背向用户，再旋转180度
+    if (orientationInfo.orientation === 'away') {
+      baseAngle += Math.PI;
+    }
+    
+    return baseAngle;
+  }
+
   /**
    * 创建单机架视图
    * @param {Object} rackData - 机架数据 (包含被点击机架的名称等)
@@ -70,6 +109,11 @@ export function useRackView() {
     console.log('useRackView: 找到机架对象:', rackObject.name, '位置:', rackObject.position);
     
     try {
+      // 初始化布局标记（如果尚未初始化）
+      if (rackViewState.layoutMarkers.size === 0 && mainModel) {
+        initLayoutMarkers(mainModel);
+      }
+      
       let rackBaseName = rackData.name; 
       if (rackData.name.includes('_')) {
         rackBaseName = rackData.name.split('_')[0];
@@ -82,8 +126,8 @@ export function useRackView() {
       const mainScene = scene;
       mainScene.remove(mainModel);
       
-      const sceneContainer = new THREE.Group();
-      sceneContainer.name = "SingleRackSceneContainer";
+    const sceneContainer = new THREE.Group();
+    sceneContainer.name = "SingleRackSceneContainer";
       mainScene.add(sceneContainer);
       
       const origin = new THREE.Group();
@@ -93,7 +137,7 @@ export function useRackView() {
       const rackClone = rackObject.clone(true);
       rackClone.position.set(0, 0, 0);
       origin.add(rackClone);
-      
+    
       // 创建搜集交互对象和父级映射的数组和Map
       const interactiveObjects = [];
       const parentMapping = new Map();
@@ -123,9 +167,9 @@ export function useRackView() {
             name: rackData.name,
             type: 'rack'
           };
-        }
-      });
-      
+      }
+    });
+    
       const rackOriginalPosition = rackObject.position.clone();
       
       let deviceCount = 0;
@@ -133,7 +177,7 @@ export function useRackView() {
 
       if (devicesForThisRack && devicesForThisRack.length > 0) {
         console.log(`useRackView: 找到 ${devicesForThisRack.length} 个设备`);
-        
+    
         devicesForThisRack.forEach(deviceObjectFromMap => {
           const deviceClone = deviceObjectFromMap.clone(true);
           
@@ -177,15 +221,28 @@ export function useRackView() {
             setupDeviceInteractivity(deviceClone);
           }
         });
-      } else {
+        } else {
         console.warn(`useRackView: 未能在 rackToDevicesMap 中为机架 "${rackBaseName}" 找到任何设备。`);
-      }
+        }
       
       console.log(`useRackView: 添加了 ${deviceCount} 个设备到单机架视图`);
       
-      origin.rotation.y = Math.PI / 4;
+      
+      // 1. 计算基准朝向角度
+      const baseOrientation = getRackInitialRotation(rackData.name);
+
+      // 2. 在基准朝向上添加45度的"透视偏移"，让用户能看到机架侧面
+      const viewOffset = -Math.PI / 4; // 45度偏移
+      const initialRotation = baseOrientation + viewOffset;
+
+      // 3. 应用计算后的角度
+      origin.rotation.y = initialRotation;
+
+      // 4. 存储相关信息
       if (sceneState) {
         sceneState.isFrontView = false;
+        sceneState.rackBaseOrientation = baseOrientation; // 存储基准朝向
+        sceneState.rackViewOffset = viewOffset;          // 存储偏移量
       }
       
       const box = new THREE.Box3().setFromObject(sceneContainer);
@@ -196,7 +253,7 @@ export function useRackView() {
       const fov = camera.fov * (Math.PI / 180);
       const cameraDistance = (maxDim / 2) / Math.tan(fov / 2) * 1.2;
       
-      camera.position.set(
+    camera.position.set(
         center.x, 
         center.y + maxDim * 0.3,
         center.z + cameraDistance * 1.0
@@ -206,17 +263,17 @@ export function useRackView() {
         center.x,
         center.y + maxDim * 0.1 - 0.2,
         center.z
-      );
+    );
       controls.update();
-      
-      sceneContainer.updateWorldMatrix(true, true);
-      
+    
+    sceneContainer.updateWorldMatrix(true, true);
+    
       if (renderer) {
         renderer.render(mainScene, camera);
       }
       
-      rackViewState.isActive = true;
-      rackViewState.sceneContainer = sceneContainer;
+    rackViewState.isActive = true;
+    rackViewState.sceneContainer = sceneContainer;
       rackViewState.sceneOrigin = origin;
       
       if (sceneState) {
@@ -255,7 +312,7 @@ export function useRackView() {
       }
       
       console.log('useRackView: 单机架视图创建完成，场景容器名称:', sceneContainer.name);
-      return true;
+    return true;
     } catch (error) {
       console.error('useRackView: 创建单机架视图时出错:', error);
       if (mainModel && !scene.children.includes(mainModel)) {
@@ -265,11 +322,11 @@ export function useRackView() {
     }
   }
 
-/**
- * 销毁单机架视图
+  /**
+   * 销毁单机架视图
  * @param {Object} context - 场景上下文
- * @returns {Boolean} 是否成功销毁
- */
+   * @returns {Boolean} 是否成功销毁
+   */
   function destroySingleRackScene(context) {
     const { scene, sceneState, mainModel, emitViewChanged, renderer, camera } = context;
     
@@ -279,7 +336,7 @@ export function useRackView() {
       console.log('开始清理单机架视图');
       
       // 1. 找到并移除所有为单机架视图创建的容器和对象
-      const container = scene.getObjectByName("SingleRackSceneContainer");
+    const container = scene.getObjectByName("SingleRackSceneContainer");
       const origin = scene.getObjectByName("SingleRackOrigin");
       
       // 记录要移除的对象列表
@@ -351,9 +408,9 @@ export function useRackView() {
       cleanupScene(scene);
       
       // 6. 更新状态 - 全面重置所有状态
-      rackViewState.isActive = false;
-      rackViewState.selectedRack = null;
-      rackViewState.sceneContainer = null;
+    rackViewState.isActive = false;
+    rackViewState.selectedRack = null;
+    rackViewState.sceneContainer = null;
       rackViewState.sceneOrigin = null;
       rackViewState.firstNetworkElementClick = true; // 确保下次进入是第一次点击
       rackViewState.isFrontView = false; // 重置视图方向状态
@@ -436,8 +493,12 @@ export function useRackView() {
       return false;
     }
     
-    // 将机架旋转到正面（0度）
-    animateRackRotation(Math.PI/2, context);
+    // 使用存储的基准朝向作为正面视图的目标角度
+    // 即移除之前添加的偏移量
+    const targetRotation = sceneState.rackBaseOrientation || 0;
+    
+    // 将机架旋转到正面角度
+    animateRackRotation(targetRotation, context);
     rackViewState.isFrontView = true;
     if (sceneState) {
       sceneState.isFrontView = true;
@@ -682,6 +743,244 @@ export function useRackView() {
     });    
   }
   
+  function createMultiRackScene(rackLayout, rackId, context) {
+    const { scene, camera, renderer, controls, mainModel } = context;
+    
+    console.log(`创建多机架视图, 类型: ${rackLayout}, ID: ${rackId}`);
+    
+    try {
+      // 1. 找到所有属于该行/列的机架
+      const multiRacks = [];
+      const devicesByRack = new Map(); // 存储每个机架的设备
+      
+      // 首先找到所有匹配的机架
+      mainModel.traverse((obj) => {
+        // 使用更灵活的匹配方式
+        const isMatchingRack = 
+          (rackLayout === 'col' && obj.name.includes(`col-${rackId}`)) ||
+          (rackLayout === 'row' && obj.name.includes(`row-${rackId}`));
+          
+        if (obj.name && isMatchingRack) {
+          if (obj.userData && obj.userData.type === 'Rack') {
+            multiRacks.push(obj);
+          }
+        }
+      });
+      
+      if (multiRacks.length === 0) {
+        console.error(`找不到${rackLayout} ${rackId}的机架`);
+        return false;
+      }
+      
+      // 2. 隐藏主模型，创建新场景
+      mainModel.visible = false;
+      
+      // 3. 创建新的场景容器
+      const sceneContainer = new THREE.Group();
+      sceneContainer.name = "MultiRackSceneContainer";
+      scene.add(sceneContainer);
+      
+      // 4. 为每个机架找到其关联的设备并按正确顺序排列
+      const sortedRacks = multiRacks.sort((a, b) => {
+        // 提取机架编号
+        const getNumber = (name) => {
+          const match = name.match(/(\d+)/);
+          return match ? parseInt(match[1]) : 0;
+        };
+        
+        const numA = getNumber(a.name);
+        const numB = getNumber(b.name);
+        
+        if (rackLayout === 'col') {
+          // 根据列号决定排序方向
+          const colNum = parseInt(rackId);
+          if (colNum % 2 === 1) {
+            // 奇数列（第1,3,5列）：从大到小（面向用户）
+            return numB - numA;
+          } else {
+            // 偶数列（第2,4,6列）：从小到大（背对用户）
+            return numA - numB;
+          }
+        }
+        
+        return numA - numB; // 行视图保持原有逻辑
+      });
+      
+      // 5. 克隆机架和设备到新场景
+      const clonedRacks = [];
+      const interactiveObjects = [];
+      const parentMap = new Map();
+      
+      sortedRacks.forEach((rack, index) => {
+        // 克隆机架
+        const rackClone = rack.clone(true);
+        
+        // 设置位置 - 根据行/列类型排列
+        if (rackLayout === 'col') {
+          // 列视图: 将机架沿X轴水平排列（用户视角）
+          rackClone.position.set(index * 2, 0, 0);
+        } else {
+          // 行视图: 将机架沿Z轴排列
+          rackClone.position.set(0, 0, index * 2);
+        }
+        
+        // 添加交互性
+        rackClone.traverse((child) => {
+          if (child.isMesh) {
+            child.userData.isInteractive = true;
+            child.userData.type = 'rack';
+            
+            // 添加到交互对象数组
+            interactiveObjects.push(child);
+            
+            // 记录父级映射
+            if (child.parent && child.parent !== rackClone) {
+              parentMap.set(child.id, child.parent);
+            }
+          }
+        });
+        
+        sceneContainer.add(rackClone);
+        clonedRacks.push(rackClone);
+        
+        // 克隆并添加该机架的设备
+        const devices = devicesByRack.get(rack) || [];
+        devices.forEach(device => {
+          const deviceClone = device.clone(true);
+          
+          // 计算设备相对于机架的位置
+          const relativePos = new THREE.Vector3().subVectors(
+            device.position,
+            rack.position
+          );
+          
+          // 设置新位置
+          deviceClone.position.copy(relativePos);
+          deviceClone.position.add(rackClone.position);
+          
+          // 添加交互性
+          deviceClone.traverse((child) => {
+            if (child.isMesh) {
+              child.userData.isInteractive = true;
+              child.userData.type = 'device';
+              
+              interactiveObjects.push(child);
+              
+              if (child.parent && child.parent !== deviceClone) {
+                parentMap.set(child.id, child.parent);
+              }
+            }
+          });
+          
+          sceneContainer.add(deviceClone);
+        });
+      });
+      
+      // 6. 调整场景到视图中心
+      const box = new THREE.Box3().setFromObject(sceneContainer);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      
+      // 7. 调整相机视角为用户视角
+      if (rackLayout === 'col') {
+        // 列视图：相机位置调整为面向机架正面
+      const maxDim = Math.max(size.x, size.y, size.z);
+      
+      camera.position.set(
+        center.x, 
+          center.y + maxDim * 0.3,
+          center.z + maxDim * 1.2  // 站在机架前方
+      );
+      
+      controls.target.set(center.x, center.y, center.z);
+      }
+      
+      // 8. 更新可交互对象和父级映射
+      if (context.setPickableObjects) {
+        context.setPickableObjects(interactiveObjects);
+      }
+      
+      if (context.setObjectParentMap) {
+        context.setObjectParentMap(parentMap);
+      }
+      
+      // 9. 强制渲染一次
+      if (renderer) {
+        renderer.render(scene, camera);
+      }
+      
+      // 10. 更新状态
+      if (context.sceneState) {
+        context.sceneState.currentView = 'multi-rack';
+        context.sceneState.multiRackLayout = rackLayout;
+        context.sceneState.multiRackId = rackId;
+      }
+      
+      // 11. 通知视图变化
+      if (context.emitViewChanged) {
+        context.emitViewChanged({
+          view: 'multi-rack',
+          data: { type: rackLayout, id: rackId }
+        });
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('创建多机架视图时出错:', error);
+      return false;
+    }
+  }
+
+  // 添加销毁多机架视图的函数
+  function destroyMultiRackScene(context) {
+    const { scene, sceneState, mainModel, emitViewChanged, renderer, camera } = context;
+    
+    try {
+      console.log('开始清理多机架视图');
+      
+      // 1. 找到并移除多机架容器
+      const container = scene.getObjectByName("MultiRackSceneContainer");
+      if (container && container.parent) {
+        console.log('移除多机架容器');
+        container.parent.remove(container);
+      }
+      
+      // 2. 恢复主场景模型
+      if (mainModel) {
+        mainModel.visible = true;
+        if (!scene.children.includes(mainModel)) {
+          scene.add(mainModel);
+        }
+      }
+      
+      // 3. 更新状态
+      if (sceneState) {
+        sceneState.currentView = 'main';
+        sceneState.multiRackLayout = null;
+        sceneState.multiRackId = null;
+      }
+      
+      // 4. 强制重绘场景
+      if (renderer && camera) {
+        renderer.render(scene, camera);
+      }
+      
+      // 5. 通知父组件
+      if (emitViewChanged) {
+        emitViewChanged({
+          view: 'main',
+          data: null
+        });
+      }
+      
+      console.log('多机架视图清理完成');
+      return true;
+    } catch (error) {
+      console.error('清理多机架视图时出错:', error);
+      return false;
+    }
+  }
+
   return {
     rackViewState,
     createSingleRackScene,
@@ -690,6 +989,9 @@ export function useRackView() {
     switchToFrontView,
     handleSingleRackViewClick,
     animateRackDevice,
-    resetRackDeviceAnimation
+    resetRackDeviceAnimation,
+    createMultiRackScene,
+    destroyMultiRackScene,
+    initLayoutMarkers // 导出初始化函数
   };
 }

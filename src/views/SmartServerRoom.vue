@@ -717,6 +717,9 @@ export default {
         selectedRack.value = data.data;
       } else if (data.view === 'single-device') {
         selectedNetworkElement.value = data.data;
+      } else if (data.view === 'multi-rack') {
+        // 新增：处理多机架视图
+        console.log('切换到多机架视图:', data.data);
       } else if (data.view === 'main') {
         // 重置选中状态
         selectedRack.value = null;

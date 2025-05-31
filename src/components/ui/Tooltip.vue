@@ -12,6 +12,9 @@
         <div v-if="title" class="tooltip-title">{{ title }}</div>
         <div v-if="content && htmlContent" class="tooltip-content" v-html="content"></div>
         <div v-else-if="content" class="tooltip-content">{{ content }}</div>
+        <div class="tooltip-right-click-tip" v-if="showRightClickTip">
+          <i class="icon-mouse-right"></i> {{ rightClickTipText }}
+        </div>
         <slot></slot>
       </div>
     </Transition>
@@ -52,6 +55,11 @@
       style: {
         type: Object,
         default: () => ({})
+      },
+      showRightClickTip: Boolean,
+      rightClickTipText: {
+        type: String,
+        default: '右键点击查看更多选项'
       }
     },
     emits: ['mouse-enter', 'mouse-leave'],
@@ -171,5 +179,19 @@
   .tooltip-fade-leave-to {
     opacity: 0;
     transform: translateY(5px);
+  }
+
+  /* 添加右键提示样式 */
+  .tooltip-right-click-tip {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #88aaff;
+    display: flex;
+    align-items: center;
+  }
+
+  .icon-mouse-right {
+    margin-right: 4px;
+    font-size: 14px;
   }
   </style>

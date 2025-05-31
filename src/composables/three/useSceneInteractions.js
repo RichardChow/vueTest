@@ -34,7 +34,8 @@ export function useSceneInteractions(options = {}) {
   const eventListeners = reactive({
     click: [],
     hover: [],
-    drag: []
+    drag: [],
+    contextMenu: [] // 新增右键菜单事件监听
   });
   
   // 公开引用
@@ -81,6 +82,7 @@ export function useSceneInteractions(options = {}) {
       containerRef.value.addEventListener('click', handleClick);
       containerRef.value.addEventListener('mousedown', handleMouseDown);
       containerRef.value.addEventListener('mouseup', handleMouseUp);
+      containerRef.value.addEventListener('contextmenu', handleContextMenu);
     }
     
     if (config.enableTouchEvents) {
@@ -107,6 +109,7 @@ export function useSceneInteractions(options = {}) {
         containerRef.value.removeEventListener('click', handleClick);
         containerRef.value.removeEventListener('mousedown', handleMouseDown);
         containerRef.value.removeEventListener('mouseup', handleMouseUp);
+        containerRef.value.removeEventListener('contextmenu', handleContextMenu);
       }
       
       if (config.enableTouchEvents) {
@@ -411,6 +414,37 @@ export function useSceneInteractions(options = {}) {
     state.isDragging = false;
   };
   
+  // 添加右键菜单处理函数
+  const handleContextMenu = (event) => {
+    event.preventDefault(); // 阻止默认右键菜单
+    
+    // 更新鼠标位置
+    updateMousePosition(event);
+    
+    // 执行射线检测
+    const intersections = performRaycast();
+    const result = filterIntersections(intersections);
+    
+    if (result) {
+      // 在触发右键菜单事件前，先触发隐藏Tooltip的事件
+      // 先让其他事件处理器知道我们要隐藏tooltip
+      eventListeners.hover.forEach(listener => {
+        if (listener.onContextMenu) {
+          listener.onContextMenu();
+        }
+      });
+      
+      // 触发注册的右键菜单事件
+      eventListeners.contextMenu.forEach(listener => {
+        listener(result.object, {
+          position: state.mousePosition,
+          intersection: result.intersection,
+          originalEvent: event
+        });
+      });
+    }
+  };
+  
   // 注册点击事件监听器
   const onObjectClick = (callback) => {
     if (typeof callback === 'function') {
@@ -453,6 +487,19 @@ export function useSceneInteractions(options = {}) {
     cleanup();
   });
   
+  // 添加注册右键菜单事件的方法
+  const onContextMenu = (callback) => {
+    if (typeof callback === 'function') {
+      eventListeners.contextMenu.push(callback);
+    }
+    return () => {
+      const index = eventListeners.contextMenu.indexOf(callback);
+      if (index !== -1) {
+        eventListeners.contextMenu.splice(index, 1);
+      }
+    };
+  };
+  
   // 返回公开的API
   return {
     // 状态
@@ -487,5 +534,6 @@ export function useSceneInteractions(options = {}) {
     
     // 新增方法
     setObjectParentMap,
+    onContextMenu,
   };
 } 

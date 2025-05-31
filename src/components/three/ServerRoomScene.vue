@@ -22,16 +22,28 @@
     :y="tooltip.y"
     :type="tooltip.type"
     :style="tooltipStyle"
+    :show-right-click-tip="tooltip.showRightClickTip"
+    :right-click-tip-text="tooltip.rightClickTipText"
+  />
+
+  <!-- 上下文菜单 -->
+  <context-menu
+    :visible="contextMenu.visible"
+    :x="contextMenu.x"
+    :y="contextMenu.y"
+    :rack-type="contextMenu.rackType"
+    @select="handleMenuSelect"
   />
 </template>
 
 <script>
 import BaseThreeScene from '@/components/three/BaseThreeScene.vue';
 import * as THREE from 'three';
-import { nextTick, ref, reactive, watch, onMounted, getCurrentInstance } from 'vue';
+import { nextTick, ref, reactive, watch, onMounted, onBeforeUnmount, getCurrentInstance } from 'vue';
 import { 
   formatDeviceName,
-  processModelParents
+  processModelParents,
+  DEVICE_TYPES
 } from '@/utils/deviceUtils';
 import { 
   createColorMap, 
@@ -43,12 +55,14 @@ import { useTooltip } from '@/composables/ui/useTooltip';
 import Tooltip from '@/components/ui/Tooltip.vue';
 import { useSceneObjects } from '@/composables/three/useSceneObjects';
 import { animate } from '@/utils/animations';
+import ContextMenu from '@/components/ui/ContextMenu.vue';
 
 export default {
   name: 'ServerRoomScene',
   components: {
     BaseThreeScene,
-    Tooltip
+    Tooltip,
+    ContextMenu
   },
   props: {
     modelPath: {
@@ -85,7 +99,7 @@ export default {
     }
   },
   emits: ['object-clicked', 'object-hover', 'scene-ready', 'model-loaded', 'view-changed', 'update:currentView'],
-  setup() {
+  setup(props, { emit }) {
     const deviceInteractionState = reactive({
         selectedDevice: null,
         hoveredDevice: null,
@@ -109,7 +123,7 @@ export default {
     
       // 场景状态
     const sceneState = reactive({
-        currentView: 'main', // 'main', 'single-rack', 'single-device'
+        currentView: 'main',
         mainScene: null,
         singleRackScene: null,
         singleDeviceScene: null,
@@ -117,12 +131,15 @@ export default {
         selectedDevice: null,
         originalCameraPosition: null,
         originalControlsTarget: null,
-        isFrontView: false, // 是否为正面视图
-        deviceAnimationStage: 0, // 设备动画阶段：0=初始，1=弹出，2=展开
-        animatingDevice: null, // 当前正在动画的设备
-        animatedDeviceParts: [], // 动画中的设备部件
-        currentDevicePositions: new Map(), // 当前动画中的设备位置
-        showTooltipInSingleRack: false // 在单机架视图中是否显示悬停提示
+        isFrontView: false,
+        rackInitialRotation: 0, // 机架初始旋转角度
+        deviceAnimationStage: 0,
+        animatingDevice: null,
+        animatedDeviceParts: [],
+        currentDevicePositions: new Map(),
+        showTooltipInSingleRack: false,
+        multiRackLayout: null,
+        multiRackId: null,
     });
 
       // 动画状态
@@ -179,7 +196,10 @@ export default {
       handleSingleRackViewClick: _handleSingleRackViewClick,
       animateRackDevice: _animateRackDevice,
       resetRackDeviceAnimation: _resetRackDeviceAnimation,
-      findDeviceByName: _findDeviceByName
+      findDeviceByName: _findDeviceByName,
+      createMultiRackScene: _createMultiRackScene,
+      destroyMultiRackScene: _destroyMultiRackScene,
+      initLayoutMarkers
     } = useRackView();
 
       // 创建 rackViewUtils 对象，封装所有方法调用
@@ -246,7 +266,8 @@ export default {
       onObjectHover,
       getHoveredObject,
       setPickableObjects,
-      setObjectParentMap
+      setObjectParentMap,
+      onContextMenu
     } = useSceneInteractions();
 
     const {
@@ -254,7 +275,9 @@ export default {
       tooltipStyle,
       showTooltip,
       hideTooltip,
-      updatePosition
+      updatePosition,
+      updateTooltip,
+      hideTooltipImmediately
     } = useTooltip({
       offset: { x: 10, y: 10 } 
     });
@@ -344,26 +367,35 @@ export default {
     // 注册悬停处理函数
     onObjectHover({
       onEnter: (object, eventData) => {
-        //if (object) {
-          //highlightObject(object);
-        //}
+        // console.log('鼠标进入对象:', object.name, '类型:', object.userData?.type);
         
         if (object) {
-          // --- 修改内容生成逻辑 ---
-          const formattedName = formatDeviceName(object.name); // 使用 formatDeviceName
-          const title = formattedName; // 将格式化名称设为标题
-          const content = ''; // 保持内容为空，或根据需要添加其他信息
-          // 例如: const content = `状态: ${object.userData?.status || '未知'}`;
+          const formattedName = formatDeviceName(object.name);
+          const title = formattedName;
+          let content = '';
+          let showRightClickTip = false;
+          
+          // 添加右键提示内容 - 修改判断条件，同时支持"rack"和"Rack"
+          if (object.userData && (object.userData.type === 'rack' || object.userData.type === 'Rack' || object.userData.type === DEVICE_TYPES.RACK)) {
+            // console.log('检测到机架对象，设置右键提示');
+            content = ''; // 不在content中显示右键提示，避免重复
+            showRightClickTip = true;
+          }
           
           const type = object.userData?.status === 'error' ? 'error' : 
                        object.userData?.status === 'warning' ? 'warning' : 'info';
+          
           if (sceneState.currentView === 'main') {
+            // console.log('显示提示，设置showRightClickTip:', showRightClickTip);
             showTooltip({ 
               title: title, 
               content: content, 
               type: type,
               x: eventData.position.clientX,
               y: eventData.position.clientY,
+              showRightClickTip: showRightClickTip,
+              rightClickTipText: '右键点击查看更多选项',
+              duration: 3000 // 设置3秒后自动消失
             });
           }
         }
@@ -371,16 +403,130 @@ export default {
       onLeave: () => {
         hideTooltip();
       },
-      onHover: (eventData) => {
+      onHover: (object, eventData) => {
         if (tooltip.visible) {
-          updatePosition(eventData.position.clientX, eventData.position.clientY); 
+          if (eventData && eventData.position) {
+            updatePosition(eventData.position.clientX, eventData.position.clientY);
+          }
         }
+      },
+      // 添加右键菜单事件处理，立即隐藏tooltip
+      onContextMenu: () => {
+        // 立即隐藏tooltip，不使用延迟
+        hideTooltipImmediately();
       }
     });
 
     
     const modelProcessed = ref(false);
     
+    // 添加上下文菜单状态
+    const contextMenu = reactive({
+      visible: false,
+      x: 0,
+      y: 0,
+      rackLayout: 'col',
+      selectedObject: null
+    });
+    
+    // 注册右键菜单事件
+    onContextMenu((object, eventData) => {
+      console.log('右键点击对象:', object.name, '类型:', object.userData?.type);
+      
+      // 检查对象是否为机架 - 修改判断条件，同时支持"rack"和"Rack"
+      if (object.userData && (object.userData.type === 'Rack' || object.userData.type === DEVICE_TYPES.RACK)) {
+        // 提取机架类型
+        const rackLayout = extractRackLayout(object.name);
+        
+        if (rackLayout) {
+          // 显示上下文菜单
+          contextMenu.visible = true;
+          contextMenu.x = eventData.position.clientX;
+          contextMenu.y = eventData.position.clientY;
+          contextMenu.rackLayout = rackLayout;
+          contextMenu.selectedObject = object;
+        }
+      }
+    });
+    
+    // 处理菜单选择
+    const handleMenuSelect = (action) => {
+      if (action === 'view-multi-rack' && contextMenu.selectedObject) {
+        // 创建多机架视图
+        createMultiRackScene(contextMenu.selectedObject);
+      }
+      
+      // 隐藏菜单
+      contextMenu.visible = false;
+    };
+    
+    // 点击其他地方隐藏菜单
+    const hideContextMenu = () => {
+      contextMenu.visible = false;
+    };
+    
+    // 添加document点击事件监听器
+    onMounted(() => {
+      document.addEventListener('click', hideContextMenu);
+    });
+    
+    onBeforeUnmount(() => {
+      document.removeEventListener('click', hideContextMenu);
+    });
+    
+    // 在setup函数中添加extractRackLayout函数定义
+    const extractRackLayout = (rackName) => {
+      if (rackName.includes('row-')) return 'row';
+      if (rackName.includes('col-')) return 'col';
+      return null;
+    };
+
+    // 在setup函数中修改createMultiRackScene函数定义
+    const createMultiRackScene = (rackData) => {
+      if (!baseScene.value || !baseScene.value.model) {
+        console.error('缺少基础场景或模型引用');
+        return false;
+      }
+      
+      // 从机架名称中提取行/列信息
+      const rackLayout = extractRackLayout(rackData.name);
+      const rackId = extractRackId(rackData.name);
+      
+      if (!rackLayout || !rackId) {
+        console.error('无法从机架名称提取行/列信息:', rackData.name);
+        return false;
+      }
+      
+      // 构建上下文对象 - 使用安全的 emit 传递
+      const context = {
+        scene: baseScene.value.scene,
+        camera: baseScene.value.camera,
+        renderer: baseScene.value.renderer,
+        controls: baseScene.value.controls,
+        mainModel: baseScene.value.model,
+        sceneState,
+        deviceInteractionState,
+        setPickableObjects,
+        setObjectParentMap,
+        // 修改为使用传入的 emit 函数
+        emitViewChanged: (data) => emit('view-changed', data)
+      };
+      
+      // 调用composable中的实现
+      return _createMultiRackScene(rackLayout, rackId, context);
+    };
+
+    // 在setup函数中添加extractRackId函数定义
+    const extractRackId = (rackName) => {
+      const rowMatch = rackName.match(/row-(\d+)/);
+      if (rowMatch && rowMatch[1]) return rowMatch[1];
+      
+      const colMatch = rackName.match(/col-(\d+)/);
+      if (colMatch && colMatch[1]) return colMatch[1];
+      
+      return null;
+    };
+
     return {
       deviceInteractionState,
       sceneState,
@@ -411,7 +557,15 @@ export default {
       animate,
       modelProcessed,
       setObjectParentMap,
-      setPickableObjects
+      setPickableObjects,
+      _createMultiRackScene,
+      contextMenu,
+      handleMenuSelect,
+      extractRackLayout,
+      extractRackId,
+      createMultiRackScene,
+      _destroyMultiRackScene,
+      initLayoutMarkers
     };
   },
   computed: {
@@ -440,7 +594,6 @@ export default {
     }
   },
   methods: {
-
     // 处理模型加载完成事件
     handleModelLoaded(data) {
       // 检查模型是否已处理
@@ -454,6 +607,13 @@ export default {
       // 获取模型引用
       const model = this.$refs.baseScene.model;
       this.sceneState.mainScene = model;
+      
+      // 初始化布局标记
+      if (this._createMultiRackScene) {
+        // 直接初始化布局标记
+        const initResult = this.initLayoutMarkers(model);
+        console.log(`初始化布局标记: 找到 ${this.rackViewState.layoutMarkers.size} 个标记`);
+      }
       
       // 创建全局状态对象
       const globalState = {
@@ -684,6 +844,9 @@ export default {
         }
       } else if (this.sceneState.currentView === 'single-device') {
         result = this.destroySingleDeviceScene(context);
+      } else if (this.sceneState.currentView === 'multi-rack') {
+        // 添加multi-rack视图的重置处理
+        result = this.destroyMultiRackScene(context);
       }
 
       // 修改这一段：主动同步构建主场景的交互对象列表
@@ -718,6 +881,9 @@ export default {
 
       // 更新当前视图
       this.sceneState.currentView = 'main';
+      // 清理 multi-rack 状态
+      this.sceneState.multiRackLayout = null;
+      this.sceneState.multiRackId = null;
       
       // 强制更新模型显示
       if (this.$refs.baseScene.model) {
@@ -920,6 +1086,12 @@ export default {
       globalState.racks.forEach(rack => {
         this.deviceInteractionState.rackMap.set(rack.name, rack);
       });
+    },
+
+    // 添加 destroyMultiRackScene 方法到 methods 中
+    destroyMultiRackScene(context) {
+      // 调用 composable 中的实现
+      return this._destroyMultiRackScene ? this._destroyMultiRackScene(context) : false;
     }
   },
   
