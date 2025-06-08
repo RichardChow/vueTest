@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { reactive } from 'vue';
-import { getRackOrientation } from '@/utils/layoutUtils';
+import { findLayoutMarkers, getRackOrientation } from '@/utils/layoutUtils';
 
 export function useDeviceView() {
   // 维护设备视图状态
@@ -16,8 +16,23 @@ export function useDeviceView() {
       stage: 0, // 0=初始, 1=弹出, 2=展开
       isAnimating: false
     },
-    originalMinDistance: null
+    originalMinDistance: null,
+    layoutMarkers: new Map() // 存储布局标记
   });
+
+  /**
+   * 初始化布局标记
+   * @param {THREE.Object3D} model - 场景模型
+   * @returns {Map<string, Object>} 布局标记映射
+   */
+  function initLayoutMarkers(model) {
+    if (!model) return new Map();
+    
+    // 查找并存储所有布局标记
+    deviceViewState.layoutMarkers = findLayoutMarkers(model);
+    console.log(`设备视图: 找到 ${deviceViewState.layoutMarkers.size} 个布局标记`);
+    return deviceViewState.layoutMarkers;
+  }
 
   /**
    * 创建单设备视图
@@ -152,6 +167,65 @@ export function useDeviceView() {
       // 6. 添加设备到场景原点
       origin.add(deviceClone);
       
+      // 6.5 处理设备朝向
+      // 初始化布局标记（如果尚未初始化）
+      if (deviceViewState.layoutMarkers.size === 0 && mainModel) {
+        initLayoutMarkers(mainModel);
+        console.log(`设备视图布局标记初始化完成: ${deviceViewState.layoutMarkers.size} 个标记`);
+      }
+      
+      // 获取设备所属机架信息
+      let rackName = null;
+      if (deviceObject.userData && deviceObject.userData.details && deviceObject.userData.details.rack) {
+        // 基本机架名称，例如 "Rack-01"
+        const basicRackName = deviceObject.userData.details.rack;
+        
+        // 尝试在主模型中查找完整的机架名称（包含朝向信息）
+        if (mainModel) {
+          // 在主模型中查找完整的机架名称
+          let fullRackName = null;
+          console.log(`正在查找机架 ${basicRackName} 的完整名称...`);
+          
+          mainModel.traverse((obj) => {
+            // 检查是否为目标机架（开头匹配基本名称）
+            if (obj.name && obj.name.startsWith(basicRackName) && 
+                obj.userData && obj.userData.type === 'Rack') {
+              fullRackName = obj.name; // 保存完整名称，如 "Rack-01_east_col-01"
+              console.log(`找到完整机架名称: ${fullRackName}，类型: ${obj.userData.type}`);
+            }
+          });
+          
+          // 使用找到的完整名称或回退到基本名称
+          rackName = fullRackName || basicRackName;
+          console.log(`设备 ${deviceData.name} 所属机架最终使用名称: ${rackName}`);
+        } else {
+          // 如果无法找到主模型，使用基本名称
+          rackName = basicRackName;
+        }
+      }
+      
+      // 获取机架的朝向信息
+      const orientationInfo = rackName ? 
+        getRackOrientation(rackName, deviceViewState.layoutMarkers) : 
+        { rotation: -Math.PI / 4 }; // 默认朝向左前方45度
+      
+      console.log('设备朝向信息:', orientationInfo);
+      
+      // 应用朝向
+      const baseRotation = orientationInfo.rotation || 0;
+      const viewOffset = -Math.PI / 2; // 左前方90度视角
+      const initialRotation = baseRotation + viewOffset;
+      console.log('initialRotation', initialRotation);
+      
+      // 设置设备旋转
+      origin.rotation.y = initialRotation;
+      
+      // 存储朝向信息
+      if (context.sceneState) {
+        context.sceneState.deviceBaseOrientation = baseRotation;
+        context.sceneState.deviceViewOffset = viewOffset;
+      }
+      
       // 7. 查找并添加设备的子部件
       const deviceParts = [];
       deviceClone.traverse(child => {
@@ -184,52 +258,12 @@ export function useDeviceView() {
           cameraDistance = 1; // 设置一个最小默认距离
       }
       
-      // 获取设备所属机架的朝向信息
-      let deviceOrientation = null;
-      if (deviceObject.userData && deviceObject.userData.details && deviceObject.userData.details.rack) {
-          const rackName = deviceObject.userData.details.rack;
-          // 使用layoutUtils中的方法获取机架朝向
-          if (context.layoutMarkers && context.layoutMarkers.size > 0) {
-              deviceOrientation = getRackOrientation(rackName, context.layoutMarkers);
-          }
-      }
-      
-      // 修改相机位置 - 根据朝向设置观察角度
-      if (deviceOrientation && deviceOrientation.direction) {
-          // 根据朝向决定相机位置
-          switch (deviceOrientation.direction) {
-              case 'east':
-                  // 东向(右侧)机架的设备需要从左前方观察
-                  camera.position.set(
-                      center.x - cameraDistance * 0.85,
-                      center.y + maxDim * 0.1,
-                      center.z + cameraDistance * 0.85
-                  );
-                  break;
-              case 'west':
-                  // 西向(左侧)机架的设备需要从右前方观察
-                  camera.position.set(
-                      center.x + cameraDistance * 0.85,
-                      center.y + maxDim * 0.1,
-                      center.z + cameraDistance * 0.85
-                  );
-                  break;
-              default:
-                  // 默认从左前方45度角观察设备（与机架视图保持一致）
-                  camera.position.set(
-                      center.x - cameraDistance * 0.85,
-                      center.y + maxDim * 0.1,
-                      center.z + cameraDistance * 0.85
-                  );
-          }
-      } else {
-          // 无法确定朝向时使用默认左前方45度角观察
-          camera.position.set(
-              center.x - cameraDistance * 0.85,
-              center.y + maxDim * 0.1,
-              center.z + cameraDistance * 0.85
-          );
-      }
+      // 修改相机位置 - 从右前方45度角观察设备
+      camera.position.set(
+        center.x - cameraDistance * 0.85,
+        center.y + maxDim * 0.1,
+        center.z + cameraDistance * 0.85
+      );
       
       // 控制器目标点保持不变
       controls.target.set(
@@ -417,6 +451,7 @@ export function useDeviceView() {
   return {
     deviceViewState,
     createSingleDeviceScene,
-    destroySingleDeviceScene
+    destroySingleDeviceScene,
+    initLayoutMarkers
   };
 }

@@ -133,6 +133,10 @@ export default {
         originalControlsTarget: null,
         isFrontView: false,
         rackInitialRotation: 0, // 机架初始旋转角度
+        rackBaseOrientation: 0, // 机架基准朝向
+        rackViewOffset: 0,      // 机架视角偏移
+        deviceBaseOrientation: 0, // 设备基准朝向
+        deviceViewOffset: 0,      // 设备视角偏移
         deviceAnimationStage: 0,
         animatingDevice: null,
         animatedDeviceParts: [],
@@ -615,6 +619,14 @@ export default {
         console.log(`初始化布局标记: 找到 ${this.rackViewState.layoutMarkers.size} 个标记`);
       }
       
+      // 同时初始化设备视图的布局标记
+      if (this.deviceViewState && this._createSingleDeviceScene) {
+        if (typeof this.deviceViewState.initLayoutMarkers === 'function') {
+          this.deviceViewState.initLayoutMarkers(model);
+          console.log(`初始化设备视图布局标记: 找到 ${this.deviceViewState.layoutMarkers.size} 个标记`);
+        }
+      }
+      
       // 创建全局状态对象
       const globalState = {
         originalMaterials: new Map(),
@@ -715,7 +727,22 @@ export default {
       }
       
       // 根据当前视图处理点击事件
-      if (this.sceneState.currentView === 'single-rack') {
+      if (this.sceneState.currentView === 'multi-rack') {
+        // 新增：在multi-rack视图中，只发送点击事件，不执行其他操作
+        console.log('multi-rack视图中点击对象:', data.name, data.type);
+        
+        // 设置选中的设备或机架
+        if (data.type === 'device' || data.type === 'NE') {
+          this.deviceInteractionState.selectedDevice = data.name;
+        } else if (data.type === 'rack') {
+          this.sceneState.selectedRack = data;
+        }
+        
+        // 只转发点击事件到父组件，不进行其他处理
+        this.$emit('object-clicked', data);
+        return;
+      }
+      else if (this.sceneState.currentView === 'single-rack') {
         this.handleSingleRackViewClick(data);
       } else if (this.sceneState.currentView === 'single-device') {
         this.handleSingleDeviceViewClick(data);
@@ -792,6 +819,7 @@ export default {
       getObjectByName: this.getObjectByName.bind(this),
       setupDeviceInteractivity: this.setupDeviceInteractivity.bind(this),
       sceneState: this.sceneState,
+        deviceInteractionState: this.deviceInteractionState,
       emitViewChanged: (data) => this.$emit('view-changed', data),
       setPickableObjects: this.setPickableObjects,
       setObjectParentMap: this.setObjectParentMap

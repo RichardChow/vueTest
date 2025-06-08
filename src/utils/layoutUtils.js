@@ -16,13 +16,13 @@ export function parseLayoutMarker(markerName) {
     const markerNumMatch = markerName.match(/Layout_Marker_(\d+)/i);
     const markerNum = markerNumMatch ? parseInt(markerNumMatch[1]) : null;
     
-    // 提取方向信息 (east, west, north, south)
-    const directionMatch = markerName.match(/(east|west|north|south)/i);
-    const direction = directionMatch ? directionMatch[1].toLowerCase() : null;
+    // 提取机房位置信息 (east, west, north, south)
+    const roomLocationMatch = markerName.match(/(east|west|north|south|middle)/i);
+    const roomLocation = roomLocationMatch ? roomLocationMatch[1].toLowerCase() : null;
     
-    // 提取具体朝向 (left, right)
-    const orientationMatch = markerName.match(/(left|right)/i);
-    const orientation = orientationMatch ? orientationMatch[1].toLowerCase() : null;
+    // 提取具体朝向 (left, right, front, back)
+    const facingMatch = markerName.match(/(left|right|front|back)/i);
+    const facing = facingMatch ? facingMatch[1].toLowerCase() : null;
     
     // 提取是列还是排
     const typeMatch = markerName.match(/(col|row)/i);
@@ -30,8 +30,8 @@ export function parseLayoutMarker(markerName) {
     
     return {
       markerId: markerNum,
-      direction, // east, west, north, south
-      orientation, // left, right
+      roomLocation, // east, west, north, south, middle - 表示机房位置/区域
+      facing, // left, right, front, back - 表示实际朝向
       layoutType, // col, row
       original: markerName,
       // 合成列/排标识，如 "col-2"
@@ -44,41 +44,45 @@ export function parseLayoutMarker(markerName) {
 }
 
 /**
- * 查找场景中的所有布局标记
+ * 在模型中查找所有布局标记
  * @param {THREE.Object3D} sceneModel - 场景模型
- * @returns {Map<string, Object>} 布局信息映射 (layoutKey -> 布局信息)
+ * @returns {Map<string, Object>} 布局标记映射表（键：layoutKey, 值：标记对象）
  */
 export function findLayoutMarkers(sceneModel) {
-  const layoutMarkers = new Map();
+  const markers = new Map();
   
-  if (!sceneModel) return layoutMarkers;
+  if (!sceneModel) return markers;
   
-  sceneModel.traverse((obj) => {
-    if (obj.name && obj.name.includes('Layout_Marker')) {
-      const layoutInfo = parseLayoutMarker(obj.name);
+  // 遍历模型查找所有布局标记
+  sceneModel.traverse((object) => {
+    if (object.name && object.name.includes('Layout_Marker')) {
+      const layoutInfo = parseLayoutMarker(object.name);
       if (layoutInfo && layoutInfo.layoutKey) {
-        layoutMarkers.set(layoutInfo.layoutKey, {
+        markers.set(layoutInfo.layoutKey, {
           ...layoutInfo,
-          object: obj // 保存对象引用
+          object
         });
       }
     }
   });
   
-  return layoutMarkers;
+  console.log(`找到 ${markers.size} 个布局标记`);
+  return markers;
 }
 
 /**
- * 获取机架所属的布局标记信息
- * @param {string} rackName - 机架名称 (如 "Rack-01_east_col-01")
+ * 获取机架布局信息
+ * @param {string} rackName - 机架名称
  * @param {Map<string, Object>} layoutMarkers - 布局标记映射
- * @returns {Object|null} 布局信息对象或null
+ * @returns {Object|null} 布局信息对象
  */
 export function getRackLayoutInfo(rackName, layoutMarkers) {
-  if (!rackName || !layoutMarkers || layoutMarkers.size === 0) return null;
-  
+  console.log('rackName', rackName);
+  console.log('layoutMarkers', layoutMarkers);
   try {
-    // 从机架名称中提取列/排信息
+    if (!rackName || !layoutMarkers || layoutMarkers.size === 0) return null;
+    
+    // 从机架名称提取列和排信息
     const colMatch = rackName.match(/col-(\d+)/i);
     const rowMatch = rackName.match(/row-(\d+)/i);
     
@@ -86,19 +90,36 @@ export function getRackLayoutInfo(rackName, layoutMarkers) {
     if (colMatch) {
       const colNum = parseInt(colMatch[1]);
       const layoutKey = `col-${colNum}`;
-      return layoutMarkers.get(layoutKey) || null;
+      
+      // 查找对应的布局标记
+      const marker = layoutMarkers.get(layoutKey);
+      
+      if (marker) {
+        return marker;
+      }
     }
     
-    // 其次尝试排匹配
+    // 如果没有列匹配，尝试排匹配
     if (rowMatch) {
       const rowNum = parseInt(rowMatch[1]);
       const layoutKey = `row-${rowNum}`;
-      return layoutMarkers.get(layoutKey) || null;
+      
+      // 查找对应的布局标记
+      const marker = layoutMarkers.get(layoutKey);
+      
+      if (marker) {
+        return marker;
+      }
     }
     
-    return null;
+    // 没有找到匹配的布局标记，返回默认值
+    return {
+      roomLocation: 'east', // 默认机房位置
+      facing: 'right',      // 默认朝向
+      layoutType: 'col'     // 默认布局类型
+    };
   } catch (error) {
-    console.error('获取机架布局信息失败:', rackName, error);
+    console.error('获取机架布局信息失败:', error);
     return null;
   }
 }
@@ -115,23 +136,39 @@ export function getRackOrientation(rackName, layoutMarkers) {
   
   // 默认朝向信息
   const defaultOrientation = {
-    direction: 'east', // 默认朝东
-    orientation: 'towards', // 默认朝向用户
-    layoutType: 'col',
-    markerId: null,
-    layoutKey: null
+    facing: 'right',      // 默认朝向右侧
+    roomLocation: 'east', // 默认位于东区
+    layoutType: 'col',    // 默认为列布局
+    rotation: 0           // 默认旋转角度
   };
   
+  // 如果没有找到布局信息，使用默认值
   if (!layoutInfo) return defaultOrientation;
   
-  // 根据布局标记确定朝向
-  const orientation = layoutInfo.orientation === 'right' ? 'away' : 'towards';
+  // 根据朝向(facing)计算旋转角度
+  let rotation = 0;
   
+  switch (layoutInfo.facing) {
+    case 'right':
+      rotation = -Math.PI / 2; // 朝右 = -90度
+      break;
+    case 'left':
+      rotation = Math.PI / 2; // 朝左 = 90度
+      break;
+    case 'back':
+      rotation = Math.PI; // 朝后 = 180度
+      break;
+    case 'front':
+    default:
+      rotation = 0; // 朝前 = 0度
+      break;
+  }
+  
+  // 返回完整的朝向信息
   return {
-    direction: layoutInfo.direction || defaultOrientation.direction,
-    orientation: orientation,
+    facing: layoutInfo.facing || defaultOrientation.facing,
+    roomLocation: layoutInfo.roomLocation || defaultOrientation.roomLocation,
     layoutType: layoutInfo.layoutType || defaultOrientation.layoutType,
-    markerId: layoutInfo.markerId,
-    layoutKey: layoutInfo.layoutKey
+    rotation: rotation
   };
-} 
+}

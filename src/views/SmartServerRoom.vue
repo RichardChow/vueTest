@@ -347,8 +347,18 @@ export default {
     // 加载设备完整信息
     const loadDeviceData = async (deviceName) => {
       try {
+        console.log('开始加载设备数据:', deviceName);
+        
+        // 尝试从API加载数据
         await fetchDeviceInfo(deviceName);
         console.log('设备数据加载完成:', deviceName);
+        console.log('加载的设备数据:', deviceData);
+        
+        // 检查数据是否有效，如果没有实际数据，使用模拟数据
+        if (!deviceData.static.name || !deviceData.dynamic.status) {
+          console.warn('API返回的数据不完整，使用模拟数据');
+          generateMockDeviceData(deviceName);
+        }
       } catch (err) {
         console.error('加载设备数据失败:', err);
         // 如果API调用失败，回退到模拟数据
@@ -358,6 +368,8 @@ export default {
 
     // 生成模拟设备数据（API调用失败时的回退方案）
     const generateMockDeviceData = (deviceName) => {
+      console.log('生成模拟数据:', deviceName);
+      
       // 静态信息
       deviceData.static.name = deviceName;
       deviceData.static.displayName = formatDeviceName(deviceName);
@@ -381,16 +393,18 @@ export default {
       deviceData.dynamic.networkOut = Math.random() * 512 * 1024; // MB/s
       deviceData.dynamic.uptime = Math.floor(Math.random() * 30 * 24 * 3600); // 随机30天内的秒数
       deviceData.dynamic.lastUpdated = new Date().toISOString();
+      
+      console.log('生成的模拟数据:', JSON.stringify(deviceData, null, 2));
     };
 
     // 处理对象点击事件
     const onObjectClicked = async (objectData) => {
       console.log('对象被点击:', objectData, '当前视图:', currentSceneView.value);
       
-      // 诊断信息：检查是否为网元设备
+      // 诊断信息：检查是否为网元设备或普通设备
       const isNE = isNetworkElement(objectData.name);
-      const isDeviceType = objectData.type === DEVICE_TYPES.NE;
-      const isDeviceObject = isDevice(objectData);
+      const isDeviceType = objectData.type === DEVICE_TYPES.NE || objectData.type === 'device';
+      const isDeviceObject = isDevice(objectData) || objectData.type === 'device';
       console.log('点击诊断:', {
         对象名称: objectData.name,
         对象类型: objectData.type,
@@ -410,10 +424,35 @@ export default {
           switchToSingleDeviceView(objectData);
           return;
         }
+      } else if (currentSceneView.value === 'multi-rack') {
+        // 多机架视图中的点击处理
+        console.log('多机架视图中点击:', objectData.name, '类型:', objectData.type);
+        
+        // 如果点击的是设备，只显示设备详情面板，不切换视图
+        if (isDeviceObject || objectData.type === 'device' || objectData.type === 'NE') {
+          console.log('多机架视图中点击设备:', objectData.name);
+          selectedDevice.value = objectData;
+          
+          // 先重置/初始化数据结构
+          clearData();
+          
+          // 显示设备详情面板
+          deviceDetailPanelVisible.value = true;
+          
+          // 加载设备数据
+          loadDeviceData(objectData.name);
+          return;
+        } else if (objectData.type === DEVICE_TYPES.RACK || objectData.type === 'rack' || objectData.type === 'Rack') {
+          // 点击机架不做任何处理
+          console.log('多机架视图中点击机架，不执行任何操作');
+          return;
+        }
       } else if (currentSceneView.value === 'single-rack') {
         // 单机架视图中的点击处理
-        if (isDeviceObject) {
-          console.log('单机架视图中点击设备:', objectData.name);
+        if (isDeviceObject || objectData.type === 'device') {
+          console.log('单机架视图中点击设备:', objectData.name, '类型:', objectData.type);
+          
+          // 在单机架视图中点击设备，直接调用handleDeviceClick
           await handleDeviceClick(objectData);
           return;
         } else {
@@ -423,10 +462,20 @@ export default {
         }
       } else if (currentSceneView.value === 'single-device') {
         // 单设备视图中的点击处理
-        console.log('单设备视图中点击:', objectData.name);
-        // 在单设备视图中，确保面板保持打开状态
+        console.log('单设备视图中点击:', objectData.name, '类型:', objectData.type);
+        
+        // 更新选中设备（如果需要）
+        if (isDeviceObject || objectData.type === 'device' || objectData.type === 'NE') {
+          selectedDevice.value = objectData;
+          
+          // 确保面板保持打开状态并加载最新数据
         if (!deviceDetailPanelVisible.value) {
           deviceDetailPanelVisible.value = true;
+          }
+          
+          // 确保加载/刷新设备数据
+          console.log('单设备视图：刷新设备数据:', objectData.name);
+          loadDeviceData(objectData.name);
         }
         return;
       }
@@ -444,19 +493,23 @@ export default {
     // 处理设备点击
     const handleDeviceClick = async (deviceData) => {
       try {
+        console.log('处理设备点击，设备数据:', deviceData);
+        
         // 设置选中设备
         selectedDevice.value = deviceData;
         
         // 先重置/初始化数据结构
         clearData(); 
         
-        // 确保面板可见性在数据加载前设置
+        // 显示设备详情面板
         deviceDetailPanelVisible.value = true;
         
-        // 然后加载数据
-        await loadDeviceData(deviceData.name);
+        // 加载设备数据（在这里添加调用）
+        console.log('单设备视图：开始加载设备数据:', deviceData.name);
+        loadDeviceData(deviceData.name);
         
         console.log('设备详情面板已显示:', deviceData.name);
+        console.log('加载的设备数据:', deviceData);
       } catch (err) {
         console.error('处理设备点击失败:', err);
         error.value = `加载设备数据失败: ${err.message}`;
@@ -555,20 +608,18 @@ export default {
           isTransitioning.value = false;
           console.log('切换到单设备视图完成');
           
-          // 显示设备详情
-          selectedDevice.value = {
-            name: deviceData.name,
-            type: deviceData.type,
-            status: getRandomStatus(),
-            ipAddress: generateRandomIP(),
-            temperature: 20 + Math.random() * 15,
-            cpuLoad: Math.random() * 100,
-            memoryUsage: Math.random() * 100,
-            diskUsage: Math.random() * 100,
-            lastUpdated: Date.now()
-          };
+          // 设置选中设备
+          selectedDevice.value = deviceData;
           
+          // 先重置/初始化数据结构
+          clearData();
+          
+          // 显示设备详情面板
           deviceDetailPanelVisible.value = true;
+          
+          // 加载设备数据（在这里添加调用）
+          console.log('单设备视图：开始加载设备数据:', deviceData.name);
+          loadDeviceData(deviceData.name);
         }
       };
       

@@ -44,21 +44,7 @@ export function useRackView() {
   function getRackInitialRotation(rackName) {
     const orientationInfo = getRackOrientation(rackName, rackViewState.layoutMarkers);
     
-    // 根据方向确定基础角度
-    let baseAngle = 0;
-    switch (orientationInfo.direction) {
-      case 'north': baseAngle = Math.PI; break; // 朝北 = 180度
-      case 'east': baseAngle = Math.PI / 2; break; // 朝东 = 90度
-      case 'west': baseAngle = -Math.PI / 2; break; // 朝西 = -90度
-      default: baseAngle = 0; // 朝南 = 0度
-    }
-    
-    // 如果是背向用户，再旋转180度
-    if (orientationInfo.orientation === 'away') {
-      baseAngle += Math.PI;
-    }
-    
-    return baseAngle;
+    return orientationInfo.rotation;
   }
 
   /**
@@ -772,6 +758,64 @@ export function useRackView() {
         return false;
       }
       
+      // 检查是否可以使用rackToDevicesMap获取设备
+      const hasRackToDevicesMap = context.deviceInteractionState && 
+                               context.deviceInteractionState.rackToDevicesMap &&
+                               context.deviceInteractionState.rackToDevicesMap.size > 0;
+      
+      console.log('是否有机架设备映射:', hasRackToDevicesMap);
+      
+      // 收集每个机架对应的设备
+      if (hasRackToDevicesMap) {
+        // 使用rackToDevicesMap直接查找设备
+        multiRacks.forEach(rack => {
+          // 尝试多种可能的机架ID格式
+          const rackName = rack.name;
+          const rackIdFull = rackName; // 完整名称
+          const rackIdBase = rackName.split('_')[0]; // 基本名称
+          const rackIdShort = rackName.replace(/^Rack-/, ''); // 去掉"Rack-"前缀
+          
+          // 从映射表中查找设备
+          let rackDevices = context.deviceInteractionState.rackToDevicesMap.get(rackIdFull) || 
+                            context.deviceInteractionState.rackToDevicesMap.get(rackIdBase) ||
+                            context.deviceInteractionState.rackToDevicesMap.get(rackIdShort);
+          
+          if (rackDevices && rackDevices.length > 0) {
+            console.log(`为机架 ${rackName} 找到 ${rackDevices.length} 个设备`);
+            devicesByRack.set(rack, rackDevices);
+          } else {
+            console.warn(`未找到机架 ${rackName} 的设备`);
+          }
+        });
+      } else {
+        // 回退方法：通过遍历查找设备
+        console.log('使用回退方法查找设备');
+        // 查找所有设备，并根据位置判断它们属于哪个机架
+        mainModel.traverse(obj => {
+          if (obj.userData && (obj.userData.type === 'device' || obj.userData.type === 'NE')) {
+            // 找到最近的机架
+            let closestRack = null;
+            let minDistance = Infinity;
+            
+            multiRacks.forEach(rack => {
+              const distance = obj.position.distanceTo(rack.position);
+              if (distance < minDistance) {
+                minDistance = distance;
+                closestRack = rack;
+              }
+            });
+            
+            // 如果距离小于阈值，将设备添加到机架
+            if (closestRack && minDistance < 5) {
+              if (!devicesByRack.has(closestRack)) {
+                devicesByRack.set(closestRack, []);
+              }
+              devicesByRack.get(closestRack).push(obj);
+            }
+          }
+        });
+      }
+      
       // 2. 隐藏主模型，创建新场景
       mainModel.visible = false;
       
@@ -815,13 +859,78 @@ export function useRackView() {
         // 克隆机架
         const rackClone = rack.clone(true);
         
-        // 设置位置 - 根据行/列类型排列
+        // 设置位置 - 根据行/列类型排列，减小间距
         if (rackLayout === 'col') {
-          // 列视图: 将机架沿X轴水平排列（用户视角）
-          rackClone.position.set(index * 2, 0, 0);
+          // 列视图: 将机架沿X轴水平排列（用户视角），减小间距为0.608
+          rackClone.position.set(index * 0.605, 0, 0);
+          
+          // 直接使用getRackInitialRotation获取机架初始旋转角度
+          const initialRotation = getRackInitialRotation(rack.name);
+          console.log(`机架 ${rack.name} 初始旋转角度: ${initialRotation}`);
+          
+          // 获取朝向信息，用于差异化处理
+          const orientationInfo = getRackOrientation(rack.name, rackViewState.layoutMarkers);
+          console.log(`机架 ${rack.name} 朝向信息:`, orientationInfo);
+          
+          // 根据不同朝向进行差异化处理
+          let adjustmentAngle = 0;
+          
+          console.log('orientationInfo.facing', orientationInfo.facing);
+          if (orientationInfo.facing === 'left') {
+            // 左朝向机架，需要逆时针旋转90度才能面向用户
+            adjustmentAngle = 0;
+          } else if (orientationInfo.facing === 'right') {
+            // 右朝向机架，需要顺时针旋转90度才能面向用户
+            adjustmentAngle = -Math.PI;
+          } else if (orientationInfo.facing === 'front') {
+            // 正面朝向机架，需要旋转180度才能面向用户
+            adjustmentAngle = Math.PI;
+          } else if (orientationInfo.facing === 'back') {
+            // 背面朝向机架，已经面向用户，不需要额外旋转
+            adjustmentAngle = 0;
+          } else {
+            // 默认使用初始旋转角度
+            adjustmentAngle = initialRotation;
+          }
+          
+          // 应用计算出的旋转角度
+          rackClone.rotation.y = initialRotation + adjustmentAngle;
+          console.log(`机架 ${rack.name} 应用旋转角度: ${initialRotation + adjustmentAngle}`);
         } else {
-          // 行视图: 将机架沿Z轴排列
-          rackClone.position.set(0, 0, index * 2);
+          // 行视图: 将机架沿Z轴排列，减小间距为0.2
+          rackClone.position.set(0, 0, index * 0.2);
+          
+          // 直接使用getRackInitialRotation获取机架初始旋转角度
+          const initialRotation = getRackInitialRotation(rack.name);
+          console.log(`机架 ${rack.name} 初始旋转角度: ${initialRotation}`);
+          
+          // 获取朝向信息，用于差异化处理
+          const orientationInfo = getRackOrientation(rack.name, rackViewState.layoutMarkers);
+          console.log(`机架 ${rack.name} 朝向信息:`, orientationInfo);
+          
+          // 在行视图中，希望机架面向X轴正方向（外侧）
+          let adjustmentAngle = 0;
+          
+          if (orientationInfo.facing === 'left') {
+            // 左朝向机架，需要旋转180度才能面向X轴正方向
+            adjustmentAngle = Math.PI;
+          } else if (orientationInfo.facing === 'right') {
+            // 右朝向机架，已经面向X轴正方向，不需要额外旋转
+            adjustmentAngle = 0;
+          } else if (orientationInfo.facing === 'front') {
+            // 正面朝向机架，需要顺时针旋转90度才能面向X轴正方向
+            adjustmentAngle = Math.PI/2;
+          } else if (orientationInfo.facing === 'back') {
+            // 背面朝向机架，需要逆时针旋转90度才能面向X轴正方向
+            adjustmentAngle = -Math.PI/2;
+          } else {
+            // 默认使用计算得到的调整角度
+            adjustmentAngle = Math.PI/2 - initialRotation;
+          }
+          
+          // 应用计算出的旋转角度
+          rackClone.rotation.y = adjustmentAngle;
+          console.log(`机架 ${rack.name} 应用旋转角度: ${adjustmentAngle}`);
         }
         
         // 添加交互性
@@ -854,9 +963,99 @@ export function useRackView() {
             rack.position
           );
           
-          // 设置新位置
-          deviceClone.position.copy(relativePos);
+          // 保存原始旋转角度，用于日志
+          const originalRotation = device.rotation ? device.rotation.y : 0;
+          
+          // 获取设备和机架的朝向信息
+          const orientationInfo = getRackOrientation(rack.name, rackViewState.layoutMarkers);
+          console.log(`设备所在机架 ${rack.name} 朝向信息:`, orientationInfo);
+          
+          // 根据不同朝向进行差异化处理
+          let deviceAdjustmentAngle = 0;
+          
+          if (orientationInfo.facing === 'left') {
+            deviceAdjustmentAngle = -Math.PI/2;
+          } else if (orientationInfo.facing === 'right') {
+            deviceAdjustmentAngle = Math.PI/2;
+          } else if (orientationInfo.facing === 'front') {
+            deviceAdjustmentAngle = Math.PI;
+          } else if (orientationInfo.facing === 'back') {
+            // 背面朝向设备，已经面向用户，不需要额外旋转
+            deviceAdjustmentAngle = 0;
+          }
+          
+          // 获取设备的初始旋转角度
+          const deviceInitialRotation = getRackInitialRotation(rack.name);
+          
+          // 根据设备类型和机架朝向调整位置
+          let adjustedRelativePos = relativePos.clone();
+          const isNetworkDevice = device.name && device.name.includes('NE_');
+          
+          // 根据机架朝向调整位置
+          if (orientationInfo.facing === 'left') {
+            // 左朝向机架 - 交换X和Z坐标，保持Y不变
+            adjustedRelativePos.set(-relativePos.z, relativePos.y, relativePos.x);
+          } else if (orientationInfo.facing === 'right') {
+            // 右朝向机架 - 交换X和Z坐标，Z取反，保持Y不变
+            adjustedRelativePos.set(relativePos.z, relativePos.y, -relativePos.x);
+          } else if (orientationInfo.facing === 'front') {
+            // 正面朝向机架 - X和Z都取反，保持Y不变
+            adjustedRelativePos.set(-relativePos.x, relativePos.y, -relativePos.z);
+          } else if (orientationInfo.facing === 'back') {
+            // 背面朝向机架 - 保持原样
+            adjustedRelativePos.copy(relativePos);
+          }
+          
+          // 网络设备可能需要额外的位置调整
+          if (isNetworkDevice) {
+            // 为不同朝向设置不同的偏移处理
+            if (orientationInfo.facing === 'left') {
+              // 左朝向机架中的设备
+              adjustedRelativePos.z += 0.07; 
+            } 
+            else if (orientationInfo.facing === 'right') {
+              // 右朝向机架中的设备
+              adjustedRelativePos.z += 0.07; 
+            }
+            else if (orientationInfo.facing === 'front') {
+              // 前朝向机架中的设备
+              adjustedRelativePos.x += 0.07; 
+            }
+            else if (orientationInfo.facing === 'back') {
+              // 后朝向机架中的设备
+              adjustedRelativePos.x -= 0.07;
+            }
+            
+            // 根据设备名称进行额外的微调
+            if (device.name.includes('NPT1800')) {
+              // NPT1800设备可能需要额外调整
+              const extraOffset = 0.03;
+              
+              if (orientationInfo.facing === 'left') {
+                adjustedRelativePos.z += extraOffset;
+              } 
+              else if (orientationInfo.facing === 'right') {
+                adjustedRelativePos.z -= extraOffset;
+              }
+              else if (orientationInfo.facing === 'front') {
+                adjustedRelativePos.x += extraOffset;
+              }
+              else if (orientationInfo.facing === 'back') {
+                adjustedRelativePos.x -= extraOffset;
+              }
+            }
+          }
+          
+          // 应用计算出的旋转角度
+          deviceClone.rotation.y = deviceInitialRotation + deviceAdjustmentAngle;
+          
+          // 设置新位置 - 使用调整后的相对位置
+          deviceClone.position.copy(adjustedRelativePos);
           deviceClone.position.add(rackClone.position);
+          
+          console.log(`设备 ${device.name} 初始角度: ${deviceInitialRotation.toFixed(2)}, 调整量: ${deviceAdjustmentAngle.toFixed(2)}, 最终旋转: ${deviceClone.rotation.y.toFixed(2)}`);
+          console.log(`设备 ${device.name} 原始相对位置: (${relativePos.x.toFixed(2)}, ${relativePos.y.toFixed(2)}, ${relativePos.z.toFixed(2)})`);
+          console.log(`设备 ${device.name} 调整后相对位置: (${adjustedRelativePos.x.toFixed(2)}, ${adjustedRelativePos.y.toFixed(2)}, ${adjustedRelativePos.z.toFixed(2)})`);
           
           // 添加交互性
           deviceClone.traverse((child) => {
@@ -884,15 +1083,58 @@ export function useRackView() {
       // 7. 调整相机视角为用户视角
       if (rackLayout === 'col') {
         // 列视图：相机位置调整为面向机架正面
-      const maxDim = Math.max(size.x, size.y, size.z);
-      
-      camera.position.set(
-        center.x, 
-          center.y + maxDim * 0.3,
-          center.z + maxDim * 1.2  // 站在机架前方
-      );
-      
-      controls.target.set(center.x, center.y, center.z);
+        const maxDim = Math.max(size.x, size.y, size.z);
+        
+        // 计算更合适的相机距离 - 根据机架数量缩放
+        const rackCount = clonedRacks.length;
+        // 基础距离系数
+        let distanceScale = 1.2;
+        
+        // 根据机架数量调整距离
+        if (rackCount == 7) {
+          // 当机架数量超过4个时，使用更小的距离倍数，避免相机过远
+          distanceScale = 0.15 + (rackCount * 0.1); // 例如5个机架：0.5 + 0.5 = 1.0
+        }
+        if (rackCount == 6) {
+          distanceScale = 0.4 + (rackCount * 0.1); // 例如5个机架：0.5 + 0.5 = 1.0
+        }
+        console.log('rackCount', rackCount);
+        console.log('distanceScale', distanceScale);
+        // 相机位置调整 - 更接近机架，更平视
+        camera.position.set(
+          center.x,                   // 水平居中
+          center.y + maxDim * 0.15,   // 降低高度，使视角更平视
+          center.z + maxDim * distanceScale // 根据机架数量调整距离
+        );
+        
+        // 控制器目标指向多机架中心，稍微上移以对准机架中部
+        controls.target.set(center.x, center.y + maxDim * 0.1, center.z);
+        controls.update();
+      } else if (rackLayout === 'row') {
+        // 行视图：相机位置调整为侧面观察
+        const maxDim = Math.max(size.x, size.y, size.z);
+        
+        // 计算更合适的相机距离 - 根据机架数量缩放
+        const rackCount = clonedRacks.length;
+        // 基础距离系数
+        let distanceScale = 1.0;
+        
+        // 根据机架数量调整距离
+        if (rackCount > 4) {
+          // 当机架数量超过4个时，使用更小的距离倍数，避免相机过远
+          distanceScale = 0.5 + (rackCount * 0.1); // 例如5个机架：0.5 + 0.5 = 1.0
+        }
+        
+        // 相机位置调整 - 侧面角度更近，更平视
+        camera.position.set(
+          center.x + maxDim * distanceScale, // 根据机架数量调整距离
+          center.y + maxDim * 0.15,         // 降低高度，使视角更平视
+          center.z                           // 与中心对齐
+        );
+        
+        // 控制器目标指向多机架中心，稍微上移以对准机架中部
+        controls.target.set(center.x, center.y + maxDim * 0.1, center.z);
+        controls.update();
       }
       
       // 8. 更新可交互对象和父级映射
